@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Secrets
+.env
+
+# Data is DVC/volume-tracked, not git
+/data/*
+!/data/.gitkeep
+
+# Node / dashboard
+dashboard/node_modules/
+dashboard/.next/
+dashboard/out/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Catatan lokal, bukan bagian repo
+hai.txt

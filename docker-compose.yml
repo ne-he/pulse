@@ -1,0 +1,83 @@
+# ──────────────────────────────────────────────────────────────────────────
+# PULSE — ONE command spins up the whole closed loop:  docker compose up --build
+#
+#   redis  ← stream bus
+#   ingestion ──► aq.events ──► ml ──► aq.predictions / aq.alerts
+#                                       │
+#                                       ├─► agent ──► aq.incidents
+#                                       └─► api (REST + WebSocket) ──► dashboard
+#
+# Walking-skeleton defaults to REPLAY mode → no API keys, no internet needed.
+# ──────────────────────────────────────────────────────────────────────────
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  ingestion:
+    build: .
+    command: python -m ingestion.run
+    env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  ml:
+    build: .
+    command: python -m ml.online.consumer
+    env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  agent:
+    build: .
+    command: python -m agent.incident
+    env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  api:
+    build: .
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Dashboard — Nehemiah's dc-runtime UI, served statically. Open http://localhost:3000
+  # It talks to the API at http://localhost:8000 + ws://localhost:8000/ws from the browser.
+  dashboard:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./Frontend_pulse:/usr/share/nginx/html:ro
+    depends_on:
+      - api
+
+volumes:
+  data:
