@@ -1,0 +1,33 @@
+name: retrain
+
+# Real-time retraining happens INSIDE the loop (drift → retrain in ml/online/consumer.py).
+# This workflow is the SCHEDULED / offline safety net: re-evaluate baselines on a
+# cadence, and provide a manual "force retrain" button. Wire it to Supabase + the
+# live registry when you graduate off the local JSON store.
+
+on:
+  schedule:
+    - cron: "0 18 * * *"   # daily 18:00 UTC (~01:00 WIB)
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why are you forcing a retrain?"
+        required: false
+        default: "manual"
+
+jobs:
+  scheduled-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Regenerate sample + evaluate batch baselines
+        run: |
+          python -m ingestion.gen_sample
+          python -m ml.batch.baseline
+      # TODO: when on Supabase, pull recent data, run drift check, retrain, push new
+      # version + model card to the remote registry, open a PR / Slack note.

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PULSE — dev board (throwaway harness)</title>
+<style>
+  :root { --bg:#0b0e14; --card:#141a24; --ink:#e6edf3; --muted:#7d8da1; --orange:#FF4500; --line:#1f2a38; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:16px 20px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
+  header h1 { font-size:16px; margin:0; letter-spacing:.5px; }
+  .pill { font-size:11px; padding:2px 8px; border-radius:99px; background:#202c3c; color:var(--muted); }
+  .pill.live { background:#0f3; color:#031; }
+  main { display:grid; grid-template-columns:2fr 1fr; gap:16px; padding:16px 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:0 0 10px; }
+  table { width:100%; border-collapse:collapse; }
+  th,td { text-align:left; padding:7px 6px; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }
+  th { color:var(--muted); font-weight:600; font-size:11px; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; }
+  .trend-up { color:#ff6b6b; } .trend-down { color:#51cf66; } .trend-flat { color:var(--muted); }
+  .controls { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  button { background:#1c2735; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px 12px; cursor:pointer; }
+  button:hover { border-color:var(--orange); }
+  button.spike { background:var(--orange); color:#180a00; border-color:var(--orange); font-weight:700; }
+  .feed { max-height:520px; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+  .incident { border-left:3px solid var(--orange); padding:8px 10px; background:#10161f; border-radius:6px; }
+  .incident .t { font-weight:600; }
+  .incident .m { color:var(--muted); font-size:12px; }
+  .incident .by { font-size:10px; color:var(--muted); text-transform:uppercase; }
+  .badge { font-size:11px; padding:1px 7px; border-radius:99px; }
+  small.note { color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>PULSE</h1>
+  <span class="pill" id="status">connecting…</span>
+  <span class="pill" id="model">model —</span>
+  <small class="note">Dev harness only — NOT the real dashboard. Build that in <code>/dashboard</code>.</small>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Live stations</h2>
+    <table>
+      <thead><tr><th>Station</th><th>PM2.5</th><th>AQI</th><th>Category</th><th>Forecast</th><th>Trend</th><th>MAE</th><th>seen</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="8"><small class="note">waiting for data…</small></td></tr></tbody>
+    </table>
+
+    <h2 style="margin-top:18px">Demo controls (replay engine)</h2>
+    <div class="controls">
+      <button onclick="ctl('pause')">⏸ Pause</button>
+      <button onclick="ctl('play')">▶ Play</button>
+      <button onclick="ctl('set_speed', null, 1200)">⏩ 2× speed</button>
+      <button class="spike" onclick="ctl('trigger_spike','jaksel',140)">💥 Spike Jaksel</button>
+      <button class="spike" onclick="ctl('trigger_spike','jakpus',140)">💥 Spike Jakpus</button>
+    </div>
+    <p><small class="note">Spike → anomaly → Gemini/template incident card appears on the right within ~1s.</small></p>
+  </section>
+
+  <section class="card">
+    <h2>Incident feed</h2>
+    <div class="feed" id="feed"><small class="note">no incidents yet — hit a spike button.</small></div>
+  </section>
+</main>
+
+<script>
+const API = location.hostname ? `http://${location.hostname}:8000` : "http://localhost:8000";
+const WS  = API.replace("http", "ws") + "/ws";
+const stations = {}; // sid -> latest prediction
+const colorFor = c => ({ "Good":"#00E400","Moderate":"#FFFF00","Unhealthy (Sensitive)":"#FF7E00",
+  "Unhealthy":"#FF0000","Very Unhealthy":"#8F3F97","Hazardous":"#7E0023" }[c] || "#888");
+
+function ctl(action, station_id=null, value=null) {
+  fetch(API + "/control", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ action, station_id, value }) });
+}
+
+function renderRows() {
+  const rows = Object.values(stations);
+  document.getElementById("rows").innerHTML = rows.length ? rows.map(p => `
+    <tr>
+      <td>${p.station_id}</td>
+      <td>${p.pm25_now?.toFixed(1)}</td>
+      <td>${p.aqi_now}</td>
+      <td><span class="dot" style="background:${colorFor(p.category_now)}"></span>${p.category_now}</td>
+      <td>${p.pm25_forecast?.toFixed(1)} <small class="note">(${p.forecast_lower?.toFixed(0)}–${p.forecast_upper?.toFixed(0)})</small></td>
+      <td class="trend-${p.trend}">${p.trend}</td>
+      <td>${p.mae_rolling ?? "—"}</td>
+      <td>${p.n_seen}</td>
+    </tr>`).join("") : `<tr><td colspan="8"><small class="note">waiting…</small></td></tr>`;
+}
+
+function addIncident(i) {
+  const feed = document.getElementById("feed");
+  if (feed.querySelector("small")) feed.innerHTML = "";
+  const el = document.createElement("div");
+  el.className = "incident";
+  el.innerHTML = `<div class="t">${i.title}</div><div class="m">${i.body}</div>
+    <div class="by">${i.generated_by} · ${i.severity} · ${i.station_id}</div>`;
+  feed.prepend(el);
+}
+
+function connect() {
+  const ws = new WebSocket(WS);
+  const s = document.getElementById("status");
+  ws.onopen = () => { s.textContent = "● live"; s.className = "pill live"; };
+  ws.onclose = () => { s.textContent = "reconnecting…"; s.className = "pill"; setTimeout(connect, 1500); };
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === "snapshot") {
+      (msg.data.predictions || []).forEach(p => stations[p.station_id] = p);
+      (msg.data.incidents || []).slice().reverse().forEach(addIncident);
+      if (msg.data.model) document.getElementById("model").textContent = "model " + msg.data.model.version;
+      renderRows();
+    } else if (msg.type === "prediction") {
+      stations[msg.data.station_id] = msg.data;
+      document.getElementById("model").textContent = "model " + msg.data.model_version;
+      renderRows();
+    } else if (msg.type === "incident") {
+      addIncident(msg.data);
+    }
+  };
+}
+connect();
+</script>
+</body>
+</html>

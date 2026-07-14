@@ -1,0 +1,29 @@
+# ──────────────────────────────────────────────────────────────
+# PULSE — shared Python deps for all services (monorepo, single venv/image)
+# Pinned loosely; lockfile/uv can come later. "1 hal baru" = river streaming ML.
+# ──────────────────────────────────────────────────────────────
+
+# Core / streaming brain
+river==0.21.1                # online / incremental ML (SNARIMAX, HalfSpaceTrees)
+redis==5.0.4                 # Redis Streams bus
+pydantic==2.7.1             # event schemas
+pydantic-settings==2.2.1    # env config
+
+# API + realtime
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+websockets==12.0
+httpx==0.27.0               # async OpenAQ / weather polling
+
+# Lifecycle / monitoring
+evidently==0.4.25           # drift reports
+pandas==2.2.2
+numpy==1.26.4
+
+# Agent (incident cards). google-generativeai is optional at runtime:
+# if GEMINI_API_KEY is missing, agent falls back to a deterministic template.
+google-generativeai==0.5.4
+
+# Dev / test
+pytest==8.2.0
+ruff==0.4.4

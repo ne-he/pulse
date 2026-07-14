@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/uplot@1.6.31/dist/uPlot.min.css">
+<script src="https://unpkg.com/uplot@1.6.31/dist/uPlot.iife.min.js"></script>
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#0A0B0F;}
+  ::-webkit-scrollbar{width:7px;height:7px;}
+  ::-webkit-scrollbar-track{background:#0A0B0F;}
+  ::-webkit-scrollbar-thumb{background:#1E2028;border:2px solid #0A0B0F;}
+  ::-webkit-scrollbar-thumb:hover{background:#2A2D38;}
+  ::-webkit-scrollbar-corner{background:#0A0B0F;}
+  @keyframes incIn{from{opacity:0;transform:translateY(-10px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.2;}}
+  @keyframes redflash{0%{opacity:0;}18%{opacity:1;}100%{opacity:0;}}
+  .u-axis,.uplot,.uplot *{font-family:'Geist Mono',monospace !important;}
+</style>
+</helmet>
+<div style="position:relative;height:100vh;width:100%;background:#0A0B0F;color:#C9CBCF;font-family:'Geist Mono','JetBrains Mono',monospace;letter-spacing:-0.01em;font-size:13px;display:flex;flex-direction:column;gap:8px;padding:8px;overflow:hidden;font-variant-numeric:tabular-nums;">
+
+  <!-- TOP BAR -->
+  <div style="display:flex;align-items:center;gap:14px;background:#111318;border:1px solid #1E2028;border-radius:4px;padding:0 14px;height:48px;flex:none;">
+    <div style="display:flex;align-items:center;gap:10px;flex:none;">
+      <div style="width:9px;height:9px;background:#FF4500;"></div>
+      <span style="font-size:14px;font-weight:600;color:#FF4500;letter-spacing:2px;">PULSE</span>
+      <span style="font-size:10px;color:#6B6F7A;letter-spacing:3px;padding-left:8px;border-left:1px solid #1E2028;">JAKARTA AIR QUALITY OPS CENTER</span>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:12px;">
+      <span style="font-size:11px;color:#C9CBCF;letter-spacing:0.08em;">STATION {{ hdr.stationName }}</span>
+      <span style="font-size:11px;color:#6B6F7A;">{{ utc }} UTC</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;flex:none;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button onClick="{{ onTogglePlay }}" style="font-family:inherit;font-size:11px;letter-spacing:0.05em;color:#C9CBCF;background:transparent;border:1px solid #1E2028;border-radius:2px;padding:5px 10px;cursor:pointer;">{{ playLabel }}</button>
+        <div style="display:flex;border:1px solid #1E2028;border-radius:2px;overflow:hidden;">
+          <sc-for list="{{ speedViews }}" as="sp" hint-placeholder-count="4">
+            <button onClick="{{ sp.onClick }}" style="font-family:inherit;font-size:11px;letter-spacing:0.05em;color:{{ sp.color }};background:{{ sp.bg }};border:none;border-right:1px solid #1E2028;padding:5px 9px;cursor:pointer;">{{ sp.label }}</button>
+          </sc-for>
+        </div>
+        <button onClick="{{ onSpike }}" style="font-family:inherit;font-size:11px;letter-spacing:0.05em;color:#FF4500;background:transparent;border:1px solid #FF4500;border-radius:2px;padding:5px 10px;cursor:pointer;">[SPIKE]</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;padding-left:14px;border-left:1px solid #1E2028;">
+        <span style="width:6px;height:6px;border-radius:50%;background:{{ wsColor }};display:inline-block;"></span>
+        <span style="font-size:11px;color:{{ wsColor }};letter-spacing:0.05em;">WS {{ wsText }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN AREA: rail | center | feed -->
+  <div style="display:flex;gap:8px;flex:1;min-height:0;">
+
+    <!-- LEFT RAIL: STATION SELECTOR -->
+    <div style="flex:1;min-width:170px;max-width:220px;display:flex;flex-direction:column;background:#111318;border:1px solid #1E2028;border-radius:4px;min-height:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid #1E2028;flex:none;">
+        <span style="font-size:11px;color:#6B6F7A;letter-spacing:0.05em;white-space:nowrap;">STATIONS</span>
+        <span style="font-size:10px;color:{{ ageColor }};letter-spacing:0.04em;white-space:nowrap;">{{ ageDot }} {{ dataAge }}</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+        <sc-for list="{{ stationViews }}" as="st" hint-placeholder-count="5">
+          <button onClick="{{ st.onSelect }}" style="flex:1;display:flex;flex-direction:column;gap:5px;align-items:stretch;text-align:left;background:{{ st.bg }};border:none;border-bottom:1px solid #16181F;border-left:{{ st.borderLeft }};padding:8px 12px;cursor:pointer;font-family:inherit;min-height:0;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:11px;letter-spacing:0.06em;color:{{ st.nameColor }};">{{ st.name }}</span>
+              <span style="font-size:11px;color:{{ st.color }};">{{ st.aqi }}</span>
+            </div>
+            <svg width="100%" height="24" viewBox="0 0 60 22" preserveAspectRatio="none" style="display:block;flex:1;min-height:14px;">
+              <polyline points="{{ st.spark }}" fill="none" stroke="{{ st.color }}" stroke-width="1" vector-effect="non-scaling-stroke"></polyline>
+            </svg>
+            <span style="font-size:11px;color:#6B6F7A;">{{ st.pm25 }} <span style="color:#3A3D46;">µg/m³ · {{ st.category }}</span></span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- CENTER: HERO CHART + STATUS GRID -->
+    <div style="flex:3;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0;">
+
+      <!-- CHART -->
+      <div style="position:relative;display:flex;flex-direction:column;background:#111318;border:1px solid #1E2028;border-radius:4px;flex:1;min-height:200px;overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid #1E2028;flex:none;z-index:6;">
+          <span style="font-size:11px;color:#6B6F7A;letter-spacing:0.05em;white-space:nowrap;">PM2.5 FORECAST &mdash; {{ hdr.stationName }} <span style="color:#3A3D46;">/ 60M HORIZON</span></span>
+          <div style="display:flex;gap:14px;font-size:11px;color:#6B6F7A;align-items:center;">
+            <span style="white-space:nowrap;"><span style="display:inline-block;width:14px;border-top:1.5px solid #C9CBCF;vertical-align:middle;margin-right:5px;"></span>ACTUAL</span>
+            <span style="white-space:nowrap;"><span style="display:inline-block;width:14px;border-top:1px dashed #FF4500;vertical-align:middle;margin-right:5px;"></span>FORECAST</span>
+            <span style="white-space:nowrap;"><span style="display:inline-block;width:10px;height:8px;background:rgba(255,69,0,0.22);vertical-align:middle;margin-right:5px;"></span>BAND</span>
+            <span style="color:{{ ageColor }};white-space:nowrap;">{{ ageDot }} {{ dataAge }}</span>
+          </div>
+        </div>
+        <div ref="{{ chartRef }}" style="flex:1;min-height:0;width:100%;padding:6px;"></div>
+        <div style="position:absolute;inset:34px 0 0 0;pointer-events:none;z-index:5;background:repeating-linear-gradient(0deg, rgba(201,203,207,0.025) 0px, rgba(201,203,207,0.025) 1px, transparent 1px, transparent 3px);"></div>
+      </div>
+
+      <!-- STATUS GRID -->
+      <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:8px;flex:none;">
+
+        <!-- STATUS HEADER -->
+        <div style="background:#111318;border:1px solid #1E2028;border-radius:4px;padding:10px 14px;display:flex;flex-direction:column;justify-content:space-between;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:11px;color:#6B6F7A;letter-spacing:0.05em;white-space:nowrap;">CURRENT PM2.5 µg/m³</span>
+            <span style="font-size:11px;color:{{ hdr.color }};">{{ hdr.category }}</span>
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:12px;margin:4px 0;">
+            <span style="font-size:52px;font-weight:400;line-height:0.9;color:{{ hdr.color }};">{{ hdr.pm25 }}</span>
+            <div style="display:flex;flex-direction:column;gap:1px;padding-bottom:5px;">
+              <span style="font-size:10px;color:#6B6F7A;letter-spacing:0.05em;">AQI</span>
+              <span style="font-size:24px;line-height:1;color:{{ hdr.color }};">{{ hdr.aqi }}</span>
+            </div>
+            <span style="font-size:24px;line-height:1;color:{{ hdr.trendColor }};padding-bottom:6px;">{{ hdr.trendArrow }}</span>
+          </div>
+          <span style="font-size:11px;color:#6B6F7A;white-space:nowrap;">FORECAST +{{ hdr.horizon }}M <span style="color:#6B6F7A;">&rarr;</span> <span style="color:{{ hdr.fColor }};">{{ hdr.fCategory }}</span></span>
+        </div>
+
+        <!-- MODEL HEALTH -->
+        <div style="background:#111318;border:1px solid #1E2028;border-radius:4px;display:flex;flex-direction:column;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #1E2028;">
+            <span style="font-size:11px;color:#6B6F7A;letter-spacing:0.05em;white-space:nowrap;">MODEL HEALTH</span>
+            <span style="font-size:10px;color:#00E400;letter-spacing:0.05em;white-space:nowrap;animation:blink 1.4s infinite;">[LEARNING]</span>
+          </div>
+          <div style="padding:8px 12px;display:flex;flex-direction:column;gap:6px;flex:1;justify-content:center;">
+            <div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;white-space:nowrap;"><span style="color:#6B6F7A;">VERSION</span><span style="color:#C9CBCF;">{{ model.version }} <span style="color:#6B6F7A;">river</span></span></div>
+            <div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;white-space:nowrap;"><span style="color:#6B6F7A;">MAE / RMSE</span><span style="color:#C9CBCF;">{{ model.mae }} / {{ model.rmse }}</span></div>
+            <div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;white-space:nowrap;"><span style="color:#6B6F7A;">EVENTS</span><span style="color:#C9CBCF;">{{ model.nSeen }}</span></div>
+            <div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;white-space:nowrap;"><span style="color:#6B6F7A;">PROMOTED</span><span style="color:#00E400;">TRUE</span></div>
+          </div>
+        </div>
+
+        <!-- DRIFT MONITOR -->
+        <div style="background:#111318;border:1px solid #1E2028;border-radius:4px;display:flex;flex-direction:column;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #1E2028;">
+            <span style="font-size:11px;color:#6B6F7A;letter-spacing:0.05em;white-space:nowrap;">DRIFT MONITOR</span>
+            <span style="font-size:10px;color:#6B6F7A;white-space:nowrap;">[{{ drift.engine }}]</span>
+          </div>
+          <div style="padding:8px 12px;display:flex;flex-direction:column;gap:6px;flex:1;justify-content:center;">
+            <div style="display:flex;align-items:baseline;gap:8px;">
+              <span style="font-size:24px;line-height:1;color:{{ drift.shareColor }};">{{ drift.sharePct }}%</span>
+              <span style="font-size:10px;color:#6B6F7A;white-space:nowrap;">{{ drift.nDrifted }}/{{ drift.nTotal }} DRIFTED</span>
+            </div>
+            <sc-for list="{{ drift.features }}" as="f" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:10px;color:#6B6F7A;width:66px;flex:none;white-space:nowrap;">{{ f.name }}</span>
+                <div style="flex:1;height:3px;background:#1E2028;overflow:hidden;">
+                  <div style="height:100%;width:{{ f.barWidth }};background:{{ f.barColor }};"></div>
+                </div>
+                <span style="font-size:10px;color:{{ f.scoreColor }};width:26px;text-align:right;flex:none;">{{ f.score }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: INCIDENT FEED (terminal log) -->
+    <div style="flex:1.1;min-width:248px;max-width:340px;display:flex;flex-direction:column;background:#111318;border:1px solid #1E2028;border-radius:4px;min-height:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid #1E2028;flex:none;">
+        <span style="font-size:11px;color:#6B6F7A;letter-spacing:0.05em;white-space:nowrap;">INCIDENT FEED</span>
+        <span style="font-size:10px;color:{{ ageColor }};letter-spacing:0.04em;white-space:nowrap;">{{ incidentCount }} ACTIVE · {{ ageDot }} {{ dataAge }}</span>
+      </div>
+      <div style="overflow-y:auto;flex:1;min-height:0;">
+        <sc-for list="{{ incidentViews }}" as="inc" hint-placeholder-count="6">
+          <div style="border-left:3px solid {{ inc.sevColor }};border-bottom:1px solid #1E2028;padding:8px 11px;animation:{{ inc.anim }};">
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:3px;">
+              <span style="font-size:11px;color:#6B6F7A;white-space:nowrap;">{{ inc.ts }}</span>
+              <span style="font-size:11px;color:{{ inc.sevColor }};letter-spacing:0.03em;white-space:nowrap;">{{ inc.sevLabel }}</span>
+              <span style="font-size:11px;color:#6B6F7A;margin-left:auto;white-space:nowrap;">{{ inc.badge }}</span>
+            </div>
+            <div style="font-size:13px;color:#C9CBCF;line-height:1.35;text-wrap:pretty;">{{ inc.title }}</div>
+            <div style="font-size:11px;color:#6B6F7A;line-height:1.45;margin-top:3px;text-wrap:pretty;">{{ inc.body }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEYBOARD HINT -->
+  <div style="position:absolute;bottom:14px;right:18px;font-size:10px;color:#3A3D46;letter-spacing:0.06em;pointer-events:none;z-index:40;">[S] TRIGGER SPIKE &nbsp;·&nbsp; [SPACE] PLAY/PAUSE</div>
+
+  <!-- CRITICAL RED FLASH -->
+  <div ref="{{ flashRef }}" style="position:absolute;inset:0;pointer-events:none;z-index:60;background:rgba(255,0,0,0.16);opacity:0;"></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    // ── backend endpoints (override via ?api=/?ws= or window.PULSE_API/PULSE_WS) ──
+    const qs = new URLSearchParams(location.search);
+    this.API = qs.get('api') || window.PULSE_API || 'http://localhost:8000';
+    this.WS  = qs.get('ws')  || window.PULSE_WS  || this.API.replace(/^http/,'ws') + '/ws';
+
+    this.stations = [
+      {id:'jaksel', name:'JAKSEL'},
+      {id:'jakpus', name:'JAKPUS'},
+      {id:'jakbar', name:'JAKBAR'},
+      {id:'jaktim', name:'JAKTIM'},
+      {id:'jakut',  name:'JAKUT'},
+    ];
+    this.chartRef = (el)=>{ this.chartEl = el; };
+    this.flashRef = (el)=>{ this.flashEl = el; };
+
+    // start empty — real data streams in from the backend (no more simulation)
+    const series = {};
+    const latest = {};
+    for(const s of this.stations){
+      series[s.id] = {ts:[],actual:[],forecast:[],lower:[],upper:[]};
+      latest[s.id] = this.placeholderPred(s.id);
+    }
+
+    this.state = {
+      selected:'jaksel',
+      series, latest,
+      incidents: [],
+      model: {version:'—', mae:0, rmse:0, n_seen:0},
+      drift: this.emptyDrift(),
+      playing:true, speed:1, connected:false,
+      recent:{},
+      now: Date.now(), lastTick: Date.now(),
+    };
+  }
+
+  // Safe zero-state so renderVals never crashes before the first frame arrives.
+  placeholderPred(id){
+    return {station_id:id, pm25_now:0, aqi_now:0, horizon_min:60,
+      pm25_forecast:0, aqi_forecast:0, forecast_lower:0, forecast_upper:0,
+      category_now:'Good', category_forecast:'Good', trend:'flat',
+      model_version:'—', mae_rolling:null, rmse_rolling:null, n_seen:0};
+  }
+  emptyDrift(){
+    const feats=['pm25','temp','humidity','wind_speed'];
+    return {engine:'—', n_total:feats.length, share_drifted:0, n_drifted:0, dataset_drift:false,
+      per_feature:feats.map(n=>({name:n, score:0, drifted:false}))};
+  }
+
+  // ---- helpers ----
+  r1(v){ return Math.round(v*10)/10; }
+  r2(v){ return Math.round(v*100)/100; }
+  clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+  aqi(pm){
+    const bp=[[0,12,0,50],[12.1,35.4,51,100],[35.5,55.4,101,150],[55.5,150.4,151,200],[150.5,250.4,201,300],[250.5,350.4,301,400],[350.5,500.4,401,500]];
+    for(const b of bp){ if(pm<=b[1]){ return Math.round((b[3]-b[2])/(b[1]-b[0])*(pm-b[0])+b[2]); } }
+    return 500;
+  }
+  cat(a){ return a<=50?'Good':a<=100?'Moderate':a<=150?'Unhealthy (Sens)':a<=200?'Unhealthy':a<=300?'Very Unhealthy':'Hazardous'; }
+  colorFor(c){
+    const m={
+      'Good':{text:'#00E400',bg:'rgba(0,228,0,0.08)'},
+      'Moderate':{text:'#E5E500',bg:'rgba(255,255,0,0.08)'},
+      'Unhealthy (Sens)':{text:'#FF7E00',bg:'rgba(255,126,0,0.08)'},
+      'Unhealthy (Sensitive)':{text:'#FF7E00',bg:'rgba(255,126,0,0.08)'},
+      'Unhealthy':{text:'#FF4444',bg:'rgba(255,0,0,0.08)'},
+      'Very Unhealthy':{text:'#A855F7',bg:'rgba(143,63,151,0.08)'},
+      'Hazardous':{text:'#DC2626',bg:'rgba(126,0,35,0.08)'},
+    };
+    return m[c]||m['Good'];
+  }
+
+  fmt(ts){
+    const d = new Date(ts);
+    return [d.getHours(),d.getMinutes(),d.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');
+  }
+
+  // ---- chart ----
+  tooltipPlugin(){
+    const self=this; let tt;
+    return {hooks:{
+      init:(u)=>{
+        tt=document.createElement('div');
+        tt.style.cssText='position:absolute;pointer-events:none;background:#0A0B0F;border:1px solid #1E2028;padding:6px 8px;font:11px "Geist Mono",monospace;color:#C9CBCF;display:none;z-index:20;white-space:nowrap;letter-spacing:-0.01em;line-height:1.5;';
+        u.over.appendChild(tt);
+      },
+      setCursor:(u)=>{
+        const {left,top,idx}=u.cursor;
+        if(idx==null||left<0||left==null){ if(tt)tt.style.display='none'; return; }
+        const t=u.data[0][idx];
+        const act=u.data[4][idx], fc=u.data[3][idx], lo=u.data[2][idx], hi=u.data[1][idx];
+        tt.innerHTML='<span style="color:#6B6F7A">'+self.fmt(t*1000)+'</span><br>'+
+          '<span style="color:#C9CBCF">ACT '+(act!=null?act.toFixed(1):'-')+'</span><br>'+
+          '<span style="color:#FF4500">FCS '+(fc!=null?fc.toFixed(1):'-')+'</span><br>'+
+          '<span style="color:#6B6F7A">BND '+(lo!=null?lo.toFixed(0):'-')+'–'+(hi!=null?hi.toFixed(0):'-')+'</span>';
+        tt.style.display='block';
+        let lx=left+14; if(lx+96>u.over.clientWidth) lx=left-96;
+        tt.style.left=lx+'px'; tt.style.top=(Math.max(4,top-10))+'px';
+      },
+    }};
+  }
+
+  chartData(ser){ return [ser.ts, ser.upper, ser.lower, ser.forecast, ser.actual]; }
+
+  ensureChart(){
+    if(this.chart || !window.uPlot || !this.chartEl) return;
+    const w = this.chartEl.clientWidth || 800;
+    const h = this.chartEl.clientHeight || 340;
+    const axFont = '11px "Geist Mono", monospace';
+    const opts = {
+      width:w, height:h,
+      padding:[8,8,0,0],
+      cursor:{ y:false, points:{show:false}, focus:{prox:1e6} },
+      legend:{show:false},
+      scales:{ x:{time:true} },
+      axes:[
+        {stroke:'#6B6F7A', font:axFont, size:34, grid:{stroke:'#1E2028', width:1}, ticks:{stroke:'#1E2028', width:1, size:4}},
+        {stroke:'#6B6F7A', font:axFont, size:42, grid:{stroke:'#1E2028', width:1}, ticks:{stroke:'#1E2028', width:1, size:4}, values:(u,vals)=>vals.map(v=>v.toFixed(0))},
+      ],
+      series:[
+        {},
+        {stroke:'transparent', points:{show:false}},
+        {stroke:'transparent', points:{show:false}},
+        {stroke:'#FF4500', width:1, dash:[5,5], points:{show:false}},
+        {stroke:'#C9CBCF', width:1.5, points:{show:false}},
+      ],
+      bands:[ {series:[1,2], fill:'rgba(255,69,0,0.13)'} ],
+      plugins:[ this.tooltipPlugin() ],
+    };
+    this.chart = new window.uPlot(opts, this.chartData(this.state.series[this.state.selected]), this.chartEl);
+  }
+
+  drawChart(){
+    this.ensureChart();
+    if(this.chart){ this.chart.setData(this.chartData(this.state.series[this.state.selected])); }
+  }
+
+  flash(){
+    const el=this.flashEl; if(!el) return;
+    el.style.animation='none'; void el.offsetWidth; el.style.animation='redflash 160ms ease-out';
+  }
+
+  // ---- live data (WebSocket + REST) ----
+  connectWS(){
+    let ws;
+    try { ws = new WebSocket(this.WS); }
+    catch(e){ this.scheduleReconnect(); return; }
+    this.ws = ws;
+    ws.onopen = ()=> this.setState({connected:true});
+    ws.onclose = ()=>{ this.setState({connected:false}); this.scheduleReconnect(); };
+    ws.onerror = ()=>{ try{ ws.close(); }catch(_){} };
+    ws.onmessage = (e)=>{
+      let msg; try{ msg = JSON.parse(e.data); }catch(_){ return; }
+      this.handleMessage(msg);
+    };
+  }
+  scheduleReconnect(){
+    clearTimeout(this._recon);
+    this._recon = setTimeout(()=>this.connectWS(), 1500);
+  }
+
+  handleMessage(msg){
+    const type = msg && msg.type, data = (msg && msg.data) || {};
+    if(type==='snapshot')   return this.applySnapshot(data);
+    if(type==='prediction') return this.applyPrediction(data);
+    if(type==='incident')   return this.applyIncident(data);
+    if(type==='alert')      return this.applyAlert(data);
+    // 'observation' ignored — prediction already carries pm25_now
+  }
+
+  modelFromPred(p, prev){
+    return {
+      version: p.model_version || prev.version,
+      mae: (p.mae_rolling!=null ? p.mae_rolling : prev.mae),
+      rmse:(p.rmse_rolling!=null ? p.rmse_rolling : prev.rmse),
+      n_seen:(p.n_seen!=null ? p.n_seen : prev.n_seen),
+    };
+  }
+
+  applyPrediction(p){
+    const id = p && p.station_id; if(!id) return;
+    this.setState(prev=>{
+      const old = prev.series[id] || {ts:[],actual:[],forecast:[],lower:[],upper:[]};
+      const ser = {ts:old.ts.slice(),actual:old.actual.slice(),forecast:old.forecast.slice(),lower:old.lower.slice(),upper:old.upper.slice()};
+      ser.ts.push(Date.now()/1000);
+      ser.actual.push(this.r1(p.pm25_now));
+      ser.forecast.push(this.r1(p.pm25_forecast));
+      ser.lower.push(this.r1(p.forecast_lower));
+      ser.upper.push(this.r1(p.forecast_upper));
+      if(ser.ts.length>120){ ['ts','actual','forecast','lower','upper'].forEach(k=>ser[k].shift()); }
+      return {
+        series:{...prev.series, [id]:ser},
+        latest:{...prev.latest, [id]:p},
+        model: this.modelFromPred(p, prev.model),
+        now:Date.now(), lastTick:Date.now(),
+      };
+    }, ()=>{ if(p.station_id===this.state.selected) this.drawChart(); });
+  }
+
+  applyIncident(inc){
+    if(!inc || !inc.incident_id) return;
+    this.setState(prev=>({
+      incidents:[inc, ...prev.incidents].slice(0,40),
+      recent:{...prev.recent, [inc.incident_id]:true},
+      now:Date.now(), lastTick:Date.now(),
+    }), ()=>{ if(inc.severity==='critical') this.flash(); });
+  }
+
+  applyAlert(a){
+    if(a && a.type==='drift' && a.context && a.context.drift){
+      this.setState({drift:this.normalizeDrift(a.context.drift), now:Date.now(), lastTick:Date.now()});
+    } else {
+      this.setState({now:Date.now(), lastTick:Date.now()});
+    }
+  }
+
+  applySnapshot(data){
+    this.setState(prev=>{
+      const latest = {...prev.latest};
+      (data.predictions||[]).forEach(p=>{ if(p&&p.station_id) latest[p.station_id]=p; });
+      let model = prev.model;
+      const anyPred = (data.predictions||[])[0];
+      if(anyPred) model = this.modelFromPred(anyPred, prev.model);
+      else if(data.model) model = {
+        version:data.model.version||'—',
+        mae:(data.model.metrics&&data.model.metrics.mae)||0,
+        rmse:(data.model.metrics&&data.model.metrics.rmse)||0,
+        n_seen:(data.model.metrics&&data.model.metrics.n_seen)||0,
+      };
+      return {
+        latest, model,
+        incidents:(data.incidents||[]).slice(0,40),
+        drift: data.drift ? this.normalizeDrift(data.drift) : prev.drift,
+        connected:true, now:Date.now(), lastTick:Date.now(),
+      };
+    }, ()=>this.drawChart());
+  }
+
+  normalizeDrift(d){
+    if(!d) return this.emptyDrift();
+    const pf = d.per_feature || {};
+    const arr = Array.isArray(pf) ? pf
+      : Object.keys(pf).map(k=>({name:k, score:pf[k].score, drifted:pf[k].drifted}));
+    return {
+      engine: d.engine || '—',
+      share_drifted: d.share_drifted!=null ? d.share_drifted : 0,
+      n_drifted: d.n_drifted!=null ? d.n_drifted : arr.filter(f=>f.drifted).length,
+      n_total: arr.length || 4,
+      dataset_drift: !!d.dataset_drift,
+      per_feature: arr.map(f=>({name:f.name, score:Number(f.score)||0, drifted:!!f.drifted})),
+    };
+  }
+
+  async seedHistory(){
+    for(const s of this.stations){
+      try{
+        const r = await fetch(this.API+'/predictions/'+s.id+'/history?limit=120');
+        if(!r.ok) continue;
+        const rows = await r.json();
+        if(!rows.length) continue;
+        const n = rows.length, base = Date.now()/1000 - n;
+        const ser = {ts:[],actual:[],forecast:[],lower:[],upper:[]};
+        rows.forEach((p,i)=>{
+          ser.ts.push(base+i);
+          ser.actual.push(this.r1(p.pm25_now));
+          ser.forecast.push(this.r1(p.pm25_forecast));
+          ser.lower.push(this.r1(p.forecast_lower));
+          ser.upper.push(this.r1(p.forecast_upper));
+        });
+        const last = rows[n-1];
+        this.setState(prev=>({series:{...prev.series,[s.id]:ser}, latest:{...prev.latest,[s.id]:last}}),
+          ()=>{ if(s.id===this.state.selected) this.drawChart(); });
+      }catch(_){}
+    }
+  }
+
+  async fetchDrift(){
+    try{
+      const r = await fetch(this.API+'/drift/status');
+      if(!r.ok) return;
+      const j = await r.json();
+      if(j && j.latest) this.setState({drift:this.normalizeDrift(j.latest)});
+    }catch(_){}
+  }
+
+  post(action, extra){
+    try{
+      fetch(this.API+'/control', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(Object.assign({action}, extra||{}))});
+    }catch(_){}
+  }
+
+  componentDidMount(){
+    this._poll = setInterval(()=>{
+      if(window.uPlot && this.chartEl){ clearInterval(this._poll); this.ensureChart(); this.drawChart(); }
+    }, 60);
+    // backfill the chart from REST, pull current drift, then go live over WebSocket
+    this.fetchDrift();
+    this.seedHistory().finally(()=>this.connectWS());
+    this._clock = setInterval(()=>this.setState({now:Date.now()}), 1000);
+    this._key = (e)=>{
+      if(e.code==='Space'){ e.preventDefault(); this.togglePlay(); }
+      else if(e.key==='s' || e.key==='S'){ this.triggerSpike(); }
+    };
+    window.addEventListener('keydown', this._key);
+    if(window.ResizeObserver && this.chartEl){
+      this._ro = new ResizeObserver(()=>{ if(this.chart){ this.chart.setSize({width:this.chartEl.clientWidth, height:this.chartEl.clientHeight}); }});
+      this._ro.observe(this.chartEl);
+    }
+  }
+  componentWillUnmount(){
+    clearInterval(this._poll); clearInterval(this._clock); clearTimeout(this._recon);
+    window.removeEventListener('keydown', this._key);
+    if(this._ro) this._ro.disconnect();
+    if(this.ws){ try{ this.ws.onclose=null; this.ws.close(); }catch(_){} }
+    if(this.chart) this.chart.destroy();
+  }
+
+  // ---- actions (drive the real backend replay engine via POST /control) ----
+  selectStation(id){ this.setState({selected:id}, ()=>this.drawChart()); }
+  togglePlay(){
+    const playing = !this.state.playing;
+    this.setState({playing});
+    this.post(playing ? 'play' : 'pause');
+  }
+  setSpeed(v){
+    this.setState({speed:v});
+    this.post('set_speed', {value: v*600});   // 1X≈1 frame/s → 10X≈10 frames/s
+  }
+  triggerSpike(){
+    this.post('trigger_spike', {station_id:this.state.selected, value:130});
+  }
+
+  sparkPoints(arr){
+    const n = Math.min(48, arr.length);
+    const a = arr.slice(arr.length-n);
+    const mn = Math.min.apply(null,a), mx = Math.max.apply(null,a);
+    const rng = (mx-mn)||1;
+    return a.map((v,i)=>((i/(n-1))*60).toFixed(1)+','+(21-((v-mn)/rng)*20).toFixed(1)).join(' ');
+  }
+
+  renderVals(){
+    const st = this.state;
+    const p = st.latest[st.selected];
+    const c = this.colorFor(p.category_now);
+    const fc = this.colorFor(p.category_forecast);
+    const sname = (this.stations.find(x=>x.id===st.selected)||{}).name;
+
+    const hdr = {
+      stationName:sname, pm25:p.pm25_now.toFixed(1), aqi:p.aqi_now,
+      category:p.category_now, color:c.text,
+      trendArrow: p.trend==='up'?'↑':p.trend==='down'?'↓':'→',
+      trendColor: p.trend==='flat'?'#6B6F7A':'#FF4500',
+      horizon:p.horizon_min, fCategory:p.category_forecast, fColor:fc.text,
+    };
+
+    const stationViews = this.stations.map(s=>{
+      const pr = st.latest[s.id];
+      const cc = this.colorFor(pr.category_now);
+      const active = s.id===st.selected;
+      return {
+        id:s.id, name:s.name, active,
+        pm25:pr.pm25_now.toFixed(1), aqi:pr.aqi_now, color:cc.text, category:pr.category_now,
+        spark:this.sparkPoints(st.series[s.id].actual),
+        borderLeft: active?'2px solid #FF4500':'2px solid transparent',
+        bg: active?'rgba(255,69,0,0.05)':'transparent',
+        nameColor: active?'#C9CBCF':'#6B6F7A',
+        onSelect: ()=>this.selectStation(s.id),
+      };
+    });
+
+    const sevColor = {info:'#6B6F7A', warning:'#FF7E00', critical:'#FF0000'};
+    const incidentViews = st.incidents.map(i=>({
+      id:i.incident_id, title:i.title, body:i.body, ts:this.fmt(i.ts),
+      sevColor:sevColor[i.severity]||'#6B6F7A', sevLabel:'['+i.severity.toUpperCase()+']',
+      badge:'['+i.generated_by+']',
+      anim: st.recent[i.incident_id] ? 'incIn 150ms ease-out' : 'none',
+    }));
+
+    const speeds=[1,2,5,10];
+    const speedViews = speeds.map(v=>({
+      label:v+'X', val:v,
+      color: v===st.speed?'#0A0B0F':'#6B6F7A',
+      bg: v===st.speed?'#FF4500':'transparent',
+      onClick: ()=>this.setSpeed(v),
+    }));
+
+    const d = st.drift;
+    const drift = {
+      engine:d.engine, sharePct:(d.share_drifted*100).toFixed(0),
+      shareColor: d.dataset_drift?'#FF7E00':'#00E400',
+      nDrifted:d.n_drifted, nTotal:d.n_total,
+      features: d.per_feature.map(f=>({
+        name:f.name, score:f.score.toFixed(2),
+        barWidth:(f.score*100).toFixed(0)+'%',
+        barColor: f.drifted?'#FF7E00':'#3A3D46',
+        scoreColor: f.drifted?'#FF7E00':'#6B6F7A',
+      })),
+    };
+
+    const ageSec = Math.max(0, Math.floor((st.now - (st.lastTick||st.now))/1000));
+    const stale = ageSec>5;
+
+    return {
+      hdr,
+      utc: new Date(st.now).toISOString().slice(11,19),
+      wsColor: st.connected?'#00E400':'#FF0000', wsText: st.connected?'LIVE':'DOWN',
+      dataAge: 'LIVE • '+ageSec+'s',
+      ageColor: stale?'#FF7E00':'#6B6F7A',
+      ageDot: stale?'◌':'●',
+      stationViews, incidentViews, incidentCount:st.incidents.length,
+      speedViews, playing:st.playing, playLabel: st.playing?'[PAUSE]':'[PLAY]',
+      model:{version:st.model.version.toUpperCase(), mae:st.model.mae.toFixed(2), rmse:st.model.rmse.toFixed(2), nSeen:st.model.n_seen.toLocaleString()},
+      drift,
+      chartRef:this.chartRef, flashRef:this.flashRef,
+      onTogglePlay: ()=>this.togglePlay(),
+      onSpike: ()=>this.triggerSpike(),
+    };
+  }
+}
+</script>
+</body>
+</html>
