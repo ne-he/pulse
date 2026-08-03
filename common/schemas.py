@@ -1,7 +1,7 @@
 """Pydantic event schemas — the typed contract that flows through the streams.
 
 Every message on the bus is one of these, serialized to JSON. The dashboard's
-TypeScript types should mirror these exactly (see dashboard/FRONTEND_SPEC.md)."""
+TypeScript types should mirror these exactly (see Frontend_pulse/FRONTEND_SPEC.md)."""
 from __future__ import annotations
 
 from datetime import UTC, datetime

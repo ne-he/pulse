@@ -17,7 +17,7 @@ from common.health import aqi_category, pm25_to_aqi
 from common.redis_bus import StreamReader, get_client, publish
 from common.schemas import Alert, Prediction
 from ml.modelcard.generate import generate_card
-from ml.monitoring.drift import FEATURES, check_drift
+from ml.monitoring.drift import FEATURES, check_drift_by_station
 from ml.online.anomaly import AnomalyDetector
 from ml.online.model import StationModel, exog_features
 from ml.registry.registry import Registry
@@ -29,9 +29,12 @@ class Engine:
         self.detectors: dict[str, AnomalyDetector] = {}
         self.registry = Registry()
 
-        # drift bookkeeping (across all stations)
-        self.reference_rows: list[dict] = []
-        self.current_rows: list[dict] = []
+        # drift bookkeeping: one reference/current window PER STATION.
+        # Pooling all stations into a single window either invents drift (when the mix
+        # of stations in the window shifts) or hides it (one station spikes, four stay
+        # calm, the pooled distribution barely moves). See ml/monitoring/drift.py.
+        self.reference_rows: dict[str, list[dict]] = {}
+        self.current_rows: dict[str, list[dict]] = {}
         self.events_since_check = 0
 
         self.version = self._bootstrap_version()
@@ -109,22 +112,43 @@ class Engine:
 
     # ── drift → retrain (closed loop) ───────────────────────────────────
     def _track_drift(self, client, event: dict) -> None:
+        """Slide ONLY this event's station window, then check every ready station."""
+        sid = event.get("station_id")
+        if not sid:
+            return  # malformed event: never let drift bookkeeping kill the loop
         row = {f: event.get(f) for f in FEATURES}
-        if len(self.reference_rows) < settings.drift_window:
-            self.reference_rows.append(row)
-            return  # still building the reference baseline
 
-        self.current_rows.append(row)
-        if len(self.current_rows) > settings.drift_window:
-            self.current_rows.pop(0)
+        reference = self.reference_rows.setdefault(sid, [])
+        if len(reference) < settings.drift_window:
+            reference.append(row)
+            return  # still building this station's reference baseline
+
+        current = self.current_rows.setdefault(sid, [])
+        current.append(row)
+        if len(current) > settings.drift_window:
+            current.pop(0)
 
         self.events_since_check += 1
-        if self.events_since_check < settings.drift_window or len(self.current_rows) < settings.drift_window:
+
+        # A station is comparable once BOTH its windows are full. Stations warm up at
+        # their own pace, so we check the ones that are ready instead of waiting for all.
+        ready = {
+            s for s, cur in self.current_rows.items()
+            if len(cur) >= settings.drift_window
+            and len(self.reference_rows.get(s, [])) >= settings.drift_window
+        }
+        if not ready or self.events_since_check < settings.drift_window:
             return
         self.events_since_check = 0
 
-        report = check_drift(pd.DataFrame(self.reference_rows), pd.DataFrame(self.current_rows))
-        print(f"[ml] drift check: share={report['share_drifted']} dataset_drift={report['dataset_drift']}")
+        report = check_drift_by_station(
+            {s: pd.DataFrame(self.reference_rows[s]) for s in ready},
+            {s: pd.DataFrame(self.current_rows[s]) for s in ready},
+        )
+        print(
+            f"[ml] drift check: stations={report['n_stations']} "
+            f"drifted={report['drifted_stations']} dataset_drift={report['dataset_drift']}"
+        )
         if report["dataset_drift"]:
             self._retrain(client, report)
 
@@ -141,9 +165,14 @@ class Engine:
             "rmse": round(sum(rmses) / len(rmses), 3) if rmses else None,
             "n_seen": sum(m.n for m in self.models.values()),
         }
+        drifted = drift_report.get("drifted_stations") or []
+        where = ", ".join(drifted) if drifted else "all"
         rec = self.registry.register(
             metrics=metrics, kind=settings.model_kind,
-            reason=f"drift-triggered retrain (share={drift_report['share_drifted']})",
+            reason=(
+                f"drift-triggered retrain (stations={where}, "
+                f"share={drift_report['share_drifted']})"
+            ),
         )
         self.registry.save_card(rec["version"], generate_card(rec, drift_report))
         self.version = rec["version"]
@@ -152,14 +181,25 @@ class Engine:
         alert = Alert(
             alert_id=str(uuid.uuid4())[:8], station_id="ALL", type="drift",
             severity="warning", score=drift_report["share_drifted"],
-            context={"new_version": rec["version"], "drift": drift_report, "metrics": metrics},
+            context={
+                "new_version": rec["version"], "drift": drift_report, "metrics": metrics,
+                "drifted_stations": drifted,
+            },
         )
         publish(client, Streams.ALERTS, alert)
 
-        # new regime becomes the reference
-        self.reference_rows = list(self.current_rows)
-        self.current_rows = []
-        print(f"[ml] 🔁 drift→retrain → promoted {rec['version']} (mae={metrics['mae']})")
+        # Re-baseline ONLY the stations that actually moved. A station that stayed calm
+        # keeps the reference it has been judged against all along, so resetting it would
+        # throw away evidence for no reason. A station that moved is now measured against
+        # its NEW regime, which is also what stops one drifting sensor from re-triggering
+        # a retrain on the same shift at every subsequent window.
+        for sid in drifted:
+            self.reference_rows[sid] = list(self.current_rows.get(sid, []))
+            self.current_rows[sid] = []
+        print(
+            f"[ml] 🔁 drift→retrain → promoted {rec['version']} "
+            f"(mae={metrics['mae']}, stations={where})"
+        )
 
 
 def run() -> None:
