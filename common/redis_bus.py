@@ -47,6 +47,36 @@ class StreamReader:
                 yield stream, msg_id, json.loads(fields["data"])
 
 
+# ── Offline side (tests, benchmarks, error-curve replay) ───────────────
+class InMemoryClient:
+    """Drop-in stand-in for ``redis.Redis`` covering only what the workers publish.
+
+    The loop's only hard infra dependency is Redis. That makes the interesting parts
+    (Engine.process, drift, retrain) untestable and unmeasurable without a server,
+    which is exactly why they had no tests. This keeps every message in a plain dict
+    so ``scripts/`` and ``tests/`` can drive the real ``Engine`` offline.
+
+    Read side is intentionally not implemented: nothing offline consumes streams yet.
+    """
+
+    def __init__(self):
+        self.streams: dict[str, list[dict]] = {}
+        self._seq = 0
+
+    def xadd(self, stream: str, fields: dict, **_kwargs) -> str:
+        self._seq += 1
+        msg_id = f"0-{self._seq}"
+        self.streams.setdefault(stream, []).append(json.loads(fields["data"]))
+        return msg_id
+
+    def messages(self, stream: str) -> list[dict]:
+        """Everything published to ``stream``, oldest first."""
+        return list(self.streams.get(stream, []))
+
+    def clear(self) -> None:
+        self.streams.clear()
+
+
 # ── Async side (API WebSocket fan-out) ─────────────────────────────────
 def get_async_client() -> aredis.Redis:
     return aredis.Redis.from_url(settings.redis_url, decode_responses=True)

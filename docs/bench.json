@@ -1,0 +1,21 @@
+{
+  "events": 10080,
+  "stations": 5,
+  "data_span_hours": 335.83,
+  "wall_seconds": 37.377,
+  "events_per_second": 269.7,
+  "latency_ms": {
+    "mean": 3.706,
+    "p50": 2.609,
+    "p95": 4.317,
+    "p99": 16.288,
+    "max": 2704.744
+  },
+  "predictions_emitted": 10080,
+  "anomalies_flagged": 5873,
+  "retrains": 23,
+  "retrains_per_hour_of_data": 0.0685,
+  "retrains_per_wall_hour_at_replay_speed": 41.09,
+  "replay_speed": 600.0,
+  "drift_window": 200
+}

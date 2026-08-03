@@ -87,3 +87,80 @@ def check_drift(reference: pd.DataFrame, current: pd.DataFrame) -> dict:
     except Exception as exc:  # noqa: BLE001
         print(f"[drift] Evidently unavailable ({exc}); using PSI fallback")
         return _drift_psi(reference, current)
+
+
+# ── per-station drift ──────────────────────────────────────────────────
+# Why this exists: PM2.5 in Jakarta is not one distribution, it is five. Station
+# baselines differ structurally (traffic density, coastline, industry), so pooling
+# every station into one window does two bad things at once. It invents drift when
+# the mix of stations in the window shifts, and it hides drift when one station goes
+# haywire while the other four stay calm. The second failure is the expensive one:
+# a fire in Jakarta Utara is exactly the event this system claims to catch.
+_MIN_ROWS = 5  # below this, PSI/Evidently have nothing to say
+
+
+def check_drift_by_station(
+    reference: dict[str, pd.DataFrame],
+    current: dict[str, pd.DataFrame],
+) -> dict:
+    """Run `check_drift` independently per station and fold the results into one report.
+
+    Returns the same keys as `check_drift` (so every existing consumer, the model card,
+    the API, and the dashboard keep working) plus `per_station`, `drifted_stations`,
+    and the station-level counts.
+
+    ── Trigger rule: retrain when ANY station drifts ──
+    The brief offered two rules: any-station, or share-of-stations >= drift_threshold.
+    Any-station is the defensible one here, and the reason is cost asymmetry, not taste.
+
+    In PULSE, "retrain" does not mean an expensive training job. The online models have
+    already adapted event by event, so a retrain snapshots that adapted state into an
+    immutable version, writes a card, and re-baselines the drifted station's reference
+    window. The cost of firing once too often is one registry row and one markdown file.
+    The cost of NOT firing is that the model card and the monitoring baseline keep
+    describing a regime that no longer exists at that station, silently, which is the
+    precise failure mode this project exists to argue against.
+
+    The share rule needs 3 of 5 Jakarta stations to move before it reacts. That threshold
+    is only reachable by a city-wide event, so it would systematically miss local ones.
+
+    The obvious objection to any-station is churn: one flaky sensor minting versions
+    forever. That is damped structurally rather than by a threshold, because after a
+    retrain only the drifted stations get their reference reset (see Engine._retrain).
+    A station that has genuinely moved to a new regime is immediately re-baselined
+    against that new regime, so it stops re-triggering on the same shift.
+
+    `share_stations_drifted` is reported anyway, so switching to the share rule later
+    is a one-line change in the caller, not a rewrite.
+    """
+    per_station: dict[str, dict] = {}
+    for sid in sorted(set(reference) & set(current)):
+        ref, cur = reference[sid], current[sid]
+        if len(ref) < _MIN_ROWS or len(cur) < _MIN_ROWS:
+            continue  # not enough evidence for this station yet
+        per_station[sid] = check_drift(ref, cur)
+
+    drifted = [sid for sid, rep in per_station.items() if rep["dataset_drift"]]
+    n_stations = len(per_station)
+    share_stations = round(len(drifted) / n_stations, 3) if n_stations else 0.0
+
+    # The flat fields describe the WORST station, so a model card that renders only
+    # `per_feature` still shows the feature table that actually caused the promotion.
+    worst_sid = max(per_station, key=lambda s: per_station[s]["share_drifted"], default=None)
+    worst = per_station.get(worst_sid, {}) if worst_sid else {}
+    engines = {rep["engine"] for rep in per_station.values()}
+
+    return {
+        "engine": engines.pop() if len(engines) == 1 else ("mixed" if engines else "none"),
+        "scope": "per_station",
+        "dataset_drift": bool(drifted),          # ← the any-station rule, argued above
+        "share_drifted": worst.get("share_drifted", 0.0),
+        "n_drifted": worst.get("n_drifted", 0),
+        "per_feature": worst.get("per_feature", {}),
+        "worst_station": worst_sid,
+        "per_station": per_station,
+        "drifted_stations": drifted,
+        "n_stations": n_stations,
+        "n_stations_drifted": len(drifted),
+        "share_stations_drifted": share_stations,
+    }

@@ -13,10 +13,14 @@ from collections import deque
 from common.config import settings
 
 try:  # river is the core dependency, but stay defensive for the skeleton
-    from river import time_series
+    from river import linear_model, optim, preprocessing, time_series
     _HAS_RIVER = True
 except Exception:  # noqa: BLE001
     _HAS_RIVER = False
+
+# No PM2.5 reading on Earth has ever come close to this. Anything above it is a
+# diverged model, not weather, and must never reach the dashboard.
+_MAX_PLAUSIBLE_PM25 = 2000.0
 
 
 def exog_features(event: dict) -> dict:
@@ -52,13 +56,53 @@ class StationModel:
         self.recent_pm25: deque[float] = deque(maxlen=settings.drift_window)
 
         self.model = None
+        self._diverged = False
         if self.kind == "river" and _HAS_RIVER:
             try:
-                self.model = time_series.SNARIMAX(p=2, d=0, q=1, m=0)
-            except Exception:  # noqa: BLE001
+                self.model = self._build_river()
+            except Exception as exc:  # noqa: BLE001
+                print(f"[model] river init failed for {station_id} ({exc}); using baseline")
                 self.model = None
         if self.model is None:
             self.kind = "baseline"
+
+    @staticmethod
+    def _build_river():
+        """SNARIMAX tuned for this data. Every parameter below was measured, not guessed.
+
+        m is the SEASONAL PERIOD and river's "no seasonality" value is 1, not 0. It was
+        m=0, which is not "off" but invalid: SNARIMAX builds lag features with
+        range(m - 1, m * sp, m), and a step of 0 raises ValueError on the FIRST
+        learn_one call. `observe()` then caught it and dropped the station to the
+        persistence baseline, permanently and silently, so online learning never ran at
+        all. Caught by tests/test_online_learning.py, fixed 2026-08-02.
+
+        With learning switched on for real, the remaining defaults turned out to diverge.
+        The MA term (q=1) feeds the model's own residuals back in as features, so at
+        river's default learning rate the errors compound: replaying the 14-day sample
+        gave a mean 1-step MAE around 5.5e10 µg/m³ and forecasts up to 1.8e11.
+
+        Measured on the full sample (10,080 events, mean 1-step MAE across 5 stations,
+        persistence baseline = 3.42):
+
+            p=2 d=0 q=1, river defaults           5.5e10   diverged
+            p=3 d=1 q=1, SGD(0.005)               5.0e10   diverged
+            p=2 d=1 q=0, river defaults            5.71    stable, worse than persistence
+            p=2 d=1 q=1, SGD(0.002) ilr=0.005      3.28    stable, beats persistence
+
+        d=1 makes the target stationary and the slower learning rates stop the MA
+        feedback loop from compounding. Re-checked over 30,000 events (the sample looped
+        three times): MAE 3.27, largest forecast 144 µg/m³, no divergence.
+        """
+        return time_series.SNARIMAX(
+            p=2, d=1, q=1, m=1,
+            regressor=(
+                preprocessing.StandardScaler()
+                | linear_model.LinearRegression(
+                    optimizer=optim.SGD(0.002), intercept_lr=0.005,
+                )
+            ),
+        )
 
     # ── error metrics (computed online from residuals) ──────────────────
     @property
@@ -83,7 +127,20 @@ class StationModel:
         if self.model is not None:
             try:
                 preds = self.model.forecast(horizon=steps, xs=[exog] * steps)
-                return float(preds[-1])
+                point = float(preds[-1])
+                # Divergence guard. The tuned config is stable over 30k events, but an
+                # online model that runs forever gets no such guarantee, and a NaN or a
+                # 1e11 µg/m³ "forecast" reaching the dashboard is worse than no forecast.
+                # Fall back to last-value for this tick and say so, loudly, once.
+                if not math.isfinite(point) or abs(point) > _MAX_PLAUSIBLE_PM25:
+                    if not self._diverged:
+                        self._diverged = True
+                        print(f"[model] ⚠️ {self.station_id}: implausible forecast "
+                              f"{point:.3g} µg/m³ after {self.n} events; using last-value "
+                              "for this tick. The online model may have diverged.")
+                else:
+                    self._diverged = False
+                    return point
             except Exception:  # noqa: BLE001
                 pass  # fall through to baseline
         return float(self.last_y if self.last_y is not None else exog.get("pm25", 20.0))
@@ -104,7 +161,13 @@ class StationModel:
         if self.model is not None:
             try:
                 self.model.learn_one(y, x=exog)
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
+                # Keep the never-break philosophy: the loop degrades instead of dying.
+                # But say so out loud. This branch swallowed a fatal river bug for six
+                # weeks while the README advertised online learning, because a silent
+                # fallback looks exactly like a working system.
+                print(f"[model] ⚠️ learn_one failed for {self.station_id} after "
+                      f"{self.n} events ({exc}); degrading to baseline")
                 self.model = None  # degrade to baseline permanently if it breaks
                 self.kind = "baseline"
         self.last_y = y

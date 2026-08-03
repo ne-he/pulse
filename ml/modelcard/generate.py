@@ -8,6 +8,37 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 
+def _station_section(drift: dict) -> str:
+    """Per-station drift table. Empty for legacy pooled reports, so old cards still render."""
+    per_station = drift.get("per_station")
+    if not per_station:
+        return ""
+    triggered = drift.get("drifted_stations") or []
+    rows = "\n".join(
+        f"| `{sid}` | {rep.get('share_drifted')} | "
+        f"{', '.join(f for f, i in rep.get('per_feature', {}).items() if i.get('drifted')) or '-'} | "
+        f"{'⚠️ **yes**' if rep.get('dataset_drift') else 'no'} |"
+        for sid, rep in sorted(per_station.items())
+    )
+    triggered_line = (
+        f"Retrain was triggered by: **{', '.join(f'`{s}`' for s in triggered)}**"
+        if triggered else "No individual station crossed the drift threshold."
+    )
+    return f"""
+### Drift per station
+Drift is evaluated independently per monitoring station, because Jakarta stations have
+structurally different PM2.5 baselines. Pooling them would hide a local event.
+
+{triggered_line}
+({drift.get('n_stations_drifted')} of {drift.get('n_stations')} stations, share
+{drift.get('share_stations_drifted')}).
+
+| Station | Share drifted | Drifted features | Triggered |
+|---|---|---|---|
+{rows}
+"""
+
+
 def generate_card(record: dict, drift: dict | None = None) -> str:
     """Render a markdown model card from a registry record (+ optional drift report)."""
     m = record.get("metrics", {})
@@ -22,6 +53,8 @@ def generate_card(record: dict, drift: dict | None = None) -> str:
 
     drift_section = ""
     if drift:
+        worst = drift.get("worst_station")
+        scope = f" (worst station: `{worst}`)" if worst else ""
         rows = "\n".join(
             f"| {feat} | {info['score']} | {'⚠️ yes' if info['drifted'] else 'no'} |"
             for feat, info in drift.get("per_feature", {}).items()
@@ -30,10 +63,10 @@ def generate_card(record: dict, drift: dict | None = None) -> str:
 ## Drift at promotion
 Engine: `{drift.get('engine')}` · share drifted: **{drift.get('share_drifted')}** · dataset drift: **{drift.get('dataset_drift')}**
 
-| Feature | Score | Drifted |
+| Feature | Score{scope} | Drifted |
 |---|---|---|
 {rows}
-"""
+{_station_section(drift)}"""
 
     return f"""# Model Card — PULSE Air-Quality Forecaster `{version}`
 

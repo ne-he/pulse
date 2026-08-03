@@ -19,6 +19,7 @@ httpx==0.27.0               # async OpenAQ / weather polling
 evidently==0.4.25           # drift reports
 pandas==2.2.2
 numpy==1.26.4
+matplotlib==3.8.4           # error-curve plot (scripts/error_curve.py, Agg backend)
 
 # Agent (incident cards). google-generativeai is optional at runtime:
 # if GEMINI_API_KEY is missing, agent falls back to a deterministic template.

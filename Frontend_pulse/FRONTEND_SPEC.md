@@ -1,5 +1,12 @@
 # PULSE Dashboard — Frontend Spec (build this part)
 
+> **Note (2026-08-02):** this file used to live in a second, otherwise empty `dashboard/`
+> folder. The repo now has exactly one dashboard folder, `Frontend_pulse/`, which is the
+> one `docker-compose.yml` serves on port 3000. The API and WebSocket contract below is
+> still the source of truth. Section 4's `dashboard/` tree is a *suggested* Next.js
+> layout, kept as written: the shipped UI is the dc-runtime app in this folder, so treat
+> that section as a plan, not a description of what is here.
+
 > This is an **ops / monitoring dashboard**, not a marketing landing page. Dark,
 > data-dense, fast. Saturn Protocol vibe is welcome (deep charcoal bg, **Lava
 > Orange `#FF4500`** accents) but **function first** — the hero is a live chart, not

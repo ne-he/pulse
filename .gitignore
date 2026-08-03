@@ -14,10 +14,10 @@ venv/
 /data/*
 !/data/.gitkeep
 
-# Node / dashboard
-dashboard/node_modules/
-dashboard/.next/
-dashboard/out/
+# Node / dashboard (the dashboard lives in Frontend_pulse/)
+Frontend_pulse/node_modules/
+Frontend_pulse/.next/
+Frontend_pulse/out/
 
 # OS / editor
 .DS_Store
