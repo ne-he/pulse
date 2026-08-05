@@ -2,13 +2,28 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=./PULSE%20Dashboard.dc.html">
   <title>PULSE — Jakarta Air Quality Ops Center</title>
   <style>html,body{margin:0;background:#0A0B0F;color:#C9CBCF;font-family:monospace}
   a{color:#FF4500}div{padding:24px}</style>
 </head>
 <body>
   <div>Loading PULSE dashboard… if it doesn't redirect,
-    <a href="./PULSE%20Dashboard.dc.html">open it here</a>.</div>
+    <a id="fallback" href="./PULSE%20Dashboard.dc.html">open it here</a>.</div>
+
+  <script>
+  // ── SATU tempat untuk mengarahkan dashboard ke backend ──────────────────────
+  // Kosongkan untuk mode lokal: dashboard memakai default-nya sendiri,
+  // http://localhost:8000, yaitu port yang dipakai docker compose.
+  // Isi dengan URL Space setelah backend di-deploy, TANPA garis miring di akhir:
+  //   var BACKEND = "https://ne-he-pulse-backend.hf.space";
+  // Dashboard menurunkan URL WebSocket-nya sendiri dari nilai ini (https -> wss),
+  // jadi cukup satu baris ini yang diubah, bukan dua.
+  var BACKEND = "";
+
+  var target = "./PULSE%20Dashboard.dc.html";
+  if (BACKEND) target += "?api=" + encodeURIComponent(BACKEND);
+  document.getElementById("fallback").href = target;
+  location.replace(target);
+  </script>
 </body>
 </html>
