@@ -1,3 +1,19 @@
+---
+title: PULSE Jakarta Air Quality
+emoji: 🌏
+colorFrom: gray
+colorTo: red
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+<!-- LIVE URL: isi setelah deploy. Ganti seluruh baris "Live demo" di bawah dengan URL asli, contoh:
+     **Live demo:** https://pulse-jakarta.vercel.app  ·  backend: https://ne-he-pulse-backend.hf.space
+     Slot ini sengaja ditaruh di bawah frontmatter, bukan di baris 1 file, karena baris 1 harus
+     tetap `---` supaya Hugging Face Spaces bisa membaca konfigurasi sdk/app_port di atas. -->
+**Live demo:** *(belum di-deploy, lihat [`docs/DEPLOY.md`](docs/DEPLOY.md))*
+
 # PULSE — Jakarta Air Quality, after deploy
 
 **Real-time air-quality intelligence for Jakarta: stream → online forecast →
