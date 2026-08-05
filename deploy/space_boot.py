@@ -68,7 +68,7 @@ def wait_for_redis(timeout_sec: float = 30.0) -> None:
             if client.ping():
                 log(f"redis siap di port {REDIS_PORT}")
                 return
-        except Exception:  # noqa: BLE001 — koneksi ditolak selama server belum listen
+        except Exception:  # noqa: BLE001, koneksi ditolak selama server belum listen
             time.sleep(0.25)
     raise RuntimeError(f"redis tidak menjawab PING dalam {timeout_sec:.0f} detik")
 

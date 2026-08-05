@@ -1,4 +1,4 @@
-# DEPLOY — PULSE
+# DEPLOY PULSE
 
 Backend di **Hugging Face Spaces** (Docker Space, gratis tanpa kartu), dashboard di
 **Vercel** (statis). **JANGAN commit secret apa pun**: `.env` sudah di-gitignore, dan
@@ -39,7 +39,7 @@ Frontend_pulse/   ──►    redis ──► ingestion ──► ml ──► 
 
 ---
 
-## 1) Backend — Hugging Face Space
+## 1) Backend: Hugging Face Space
 
 ### a. Buat Space
 1. [huggingface.co](https://huggingface.co) → login → **New → Space**.
@@ -84,7 +84,7 @@ mati dan bukan API-nya yang bermasalah, lihat langkah 5.
 
 ---
 
-## 2) Dashboard — Vercel
+## 2) Dashboard: Vercel
 
 Dashboard-nya HTML statis, tidak ada build step.
 
