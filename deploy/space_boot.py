@@ -1,8 +1,9 @@
-"""Nyalakan seluruh loop PULSE di dalam SATU container (Hugging Face Spaces).
+"""Nyalakan seluruh loop PULSE di dalam SATU container.
 
 `docker-compose.yml` memecah sistem jadi lima layanan: redis, ingestion, ml,
-agent, api. Docker Space cuma memberi satu container dan satu port, jadi
-kelimanya harus hidup di bawah satu proses induk. File ini yang mengurusnya.
+agent, api. Host gratis (Render, dan dulu Hugging Face Space) cuma memberi satu
+container dan satu port, dan background worker di sana berbayar, jadi kelimanya
+harus hidup di bawah satu proses induk. File ini yang mengurusnya.
 
 Urutannya penting. Redis dinyalakan lebih dulu dan BARU dianggap siap setelah
 benar-benar menjawab PING, bukan setelah prosesnya muncul. Tiga worker yang
