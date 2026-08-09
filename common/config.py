@@ -37,7 +37,12 @@ class Settings(BaseSettings):
     uncertainty_z: float = 1.96
 
     # ── Anomaly ────────────────────────────────────────────
+    # Threshold is on score = z / (1 + z), so it converts to sigmas directly:
+    # 0.85 <=> z >= 5.67. See ml/online/anomaly.py for the measured rates.
     anomaly_threshold: float = 0.85
+    anomaly_warmup: int = 30             # events before the detector may alarm
+    anomaly_aqi_floor: int = 51          # ignore anomalies in Good air (US AQI < 51)
+    anomaly_window: int = 300            # residuals kept for the robust spread
 
     # ── Drift / retrain ────────────────────────────────────
     drift_window: int = 200

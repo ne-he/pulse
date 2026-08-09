@@ -12,6 +12,7 @@ from ml.monitoring.drift import check_drift
 from ml.online.anomaly import AnomalyDetector
 from ml.online.model import StationModel, exog_features
 from ml.registry.registry import Registry
+from tests.conftest import calm_events, polluted_events
 
 
 def test_aqi_conversion_monotonic_and_categories():
@@ -54,29 +55,77 @@ def test_anomaly_detector_flags_spike_on_realistic_signal():
     assert flagged_at_spike, "a 10x jump should be flagged on the event itself"
 
 
-def test_anomaly_detector_flags_spike_on_constant_signal_but_late():
-    """Same spike on a perfectly flat signal is caught, but two events late.
+def test_anomaly_detector_flags_spike_on_constant_signal_without_lag():
+    """Same spike on a perfectly flat signal, caught on the event itself.
 
-    This is not a nit. `score_one` runs BEFORE `learn_one`, and river's
-    MinMaxScaler returns 0 while min == max. On a dead-flat warmup the scaler
-    has seen one distinct value, so the spike is scaled to 0 and is invisible
-    to HalfSpaceTrees at the moment it arrives. The scaler only learns the new
-    range afterwards, so the alarm lands on the events that follow.
+    This used to fire two events late. The detector scored a HalfSpaceTrees
+    pipeline whose MinMaxScaler returns 0 while min == max, so on a dead-flat
+    warmup the spike was scaled to 0 and was invisible at the moment it arrived.
+    Scoring the one-step residual instead has no such blind spot: a flat history
+    gives a residual spread of 0, which the 0.5 ug/m3 floor turns into a very
+    large z rather than a divide-by-zero.
 
-    Measured: event 100 scores 0.0000, event 102 scores 0.9155.
-
-    A dead-flat sensor is not a real air-quality feed, so this lag is accepted
-    rather than fixed. It is pinned here so that if someone reorders score/learn
-    or swaps the scaler, the change in behaviour shows up as a failing test
-    instead of a silent regression in detection latency.
+    Pinned at exactly 100 so that any future detector that reintroduces a
+    detection lag fails here instead of regressing silently.
     """
     det = AnomalyDetector("jaksel", threshold=0.7)
     fired_at = [i for i in range(120)
                 if det.score({"pm25": 200.0 if i == 100 else 20.0, "wind_speed": 1.0})[1]]
-    assert fired_at, "a 10x jump should be flagged eventually"
-    assert 100 <= fired_at[0] <= 105, (
-        f"detection latency regressed: first flag at event {fired_at[0]}, expected within 100-105"
+    assert fired_at, "a 10x jump should be flagged"
+    assert fired_at[0] == 100, (
+        f"detection latency regressed: first flag at event {fired_at[0]}, expected 100"
     )
+
+
+def test_anomaly_detector_is_quiet_on_a_calm_feed():
+    """Specificity, the half the suite used to be missing.
+
+    Every anomaly test here only ever asked "does it catch a spike". Nothing
+    asked "does it stay quiet otherwise", so a detector that fired on 58.3% of
+    the real 10,080 event sample sat in the repo with a green suite and a note
+    in the README admitting it. Business-as-usual air must produce no incidents:
+    at PM2.5 ~ N(20, 3) the AQI is already Moderate, so the materiality floor is
+    not what keeps this quiet, the statistic is.
+    """
+    det = AnomalyDetector("jaksel")
+    fired = sum(det.score(e)[1] for e in calm_events("jaksel", 500))
+    assert fired == 0, f"{fired} false alarms on a calm feed, expected none"
+
+
+def test_anomaly_detector_rate_stays_selective_across_regimes():
+    """A feed that shifts regime should alarm on the TRANSITION, not throughout.
+
+    Calm air followed by a pollution episode is the case the dashboard exists
+    for. The detector should mark the jump and then settle, because a sustained
+    high regime is drift's job (ml/monitoring/drift.py), not the anomaly
+    detector's. The ceiling is deliberately loose: this pins "selective" as a
+    property, it does not pretend to be a calibration against labelled events.
+    """
+    events = calm_events("jaksel", 250) + polluted_events("jaksel", 250, start=250)
+    det = AnomalyDetector("jaksel")
+    flags = [i for i, e in enumerate(events) if det.score(e)[1]]
+
+    assert flags, "the calm -> polluted transition should raise at least one alert"
+    assert flags[0] == 250, f"expected the alert on the regime change, got event {flags[0]}"
+    assert len(flags) / len(events) < 0.05, (
+        f"alert rate {len(flags) / len(events):.1%} is not selective "
+        f"({len(flags)} of {len(events)} events)"
+    )
+
+
+def test_anomaly_detector_ignores_odd_but_clean_air():
+    """A statistically odd reading in Good air is not an incident.
+
+    Without this floor the incident feed narrates "PM2.5 spike" over readings of
+    a few ug/m3, which is clean air. That is the difference between a list an ops
+    team acts on and a list they mute.
+    """
+    det = AnomalyDetector("jaksel")
+    for _ in range(60):                       # settle on a very clean baseline
+        det.score({"pm25": 3.0, "wind_speed": 2.0})
+    score, is_anom = det.score({"pm25": 9.0, "wind_speed": 2.0})   # AQI 38, still Good
+    assert score > 0.85, "the jump is genuinely surprising in statistical terms"
+    assert not is_anom, "but Good air must not be reported as an incident"
 
 
 def test_drift_detects_shift():

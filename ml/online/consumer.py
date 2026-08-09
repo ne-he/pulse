@@ -103,10 +103,18 @@ class Engine:
                     "forecast": round(point, 2),
                     "category_forecast": aqi_category(aqi_fc)[0],
                     "horizon_min": model.horizon_minutes(),
+                    # What the reading jumped FROM, so the card can say "18 -> 120"
+                    # and get the verb right instead of calling every anomaly a spike.
+                    "direction": detector.direction,
+                    "pm25_prev": round(detector.prev_pm25, 2)
+                    if detector.prev_pm25 is not None else None,
+                    "delta": round(detector.last_resid, 2),
+                    "sigmas": round(score / (1.0 - score), 1) if score < 1.0 else None,
                 },
             )
             publish(client, Streams.ALERTS, alert)
-            print(f"[ml] 🚨 anomaly @ {sid} score={score:.2f} pm2.5={y:.1f}")
+            arrow = "▲" if detector.direction == "up" else "▼"
+            print(f"[ml] 🚨 anomaly @ {sid} {arrow} score={score:.2f} pm2.5={y:.1f}")
 
         self._track_drift(client, event)
 
@@ -202,9 +210,15 @@ class Engine:
         )
 
 
-def run() -> None:
+def run(engine: Engine | None = None) -> None:
+    """Consume events forever, learning from each one.
+
+    `engine` can be supplied already warmed. `deploy/demo.py` fast-forwards an
+    Engine over historical frames before the API starts and hands that same
+    instance over, so the live model continues from what it learned instead of
+    restarting at n_seen=0 behind a dashboard that shows thousands of events."""
     client = get_client()
-    engine = Engine()
+    engine = engine if engine is not None else Engine()
     reader = StreamReader(client, [Streams.EVENTS])
     print(f"[ml] consumer online (model={settings.model_kind}, active={engine.version})")
     while True:
