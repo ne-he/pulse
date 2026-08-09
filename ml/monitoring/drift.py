@@ -80,12 +80,22 @@ def _drift_evidently(reference: pd.DataFrame, current: pd.DataFrame) -> dict:
     }
 
 
+_evidently_warned = False
+
+
 def check_drift(reference: pd.DataFrame, current: pd.DataFrame) -> dict:
     """Return a drift report. Tries Evidently, falls back to PSI on any error."""
+    global _evidently_warned
     try:
         return _drift_evidently(reference, current)
     except Exception as exc:  # noqa: BLE001
-        print(f"[drift] Evidently unavailable ({exc}); using PSI fallback")
+        # Once per process, not once per check. A per-station check runs this for
+        # every ready station on every window, so the un-suppressed version buried
+        # the actual drift and retrain lines under repeats of the same warning.
+        if not _evidently_warned:
+            _evidently_warned = True
+            print(f"[drift] Evidently unavailable ({exc}); using the PSI fallback "
+                  "for the rest of this run")
         return _drift_psi(reference, current)
 
 
