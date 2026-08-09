@@ -14,10 +14,14 @@ Rules:
 
 ANOMALY_USER = """Write an incident card for this anomaly.
 Station: {station_name} ({station_id})
-Current PM2.5: {pm25} µg/m³  (AQI {aqi_now}, {category})
-Anomaly score: {score}
+PM2.5 moved {direction}: {pm25_prev} -> {pm25} µg/m³ (change {delta})
+Now: AQI {aqi_now}, {category}
+How unusual: {sigmas} sigmas from this station's normal step size (score {score})
 Wind speed: {wind_speed} m/s
 Forecast (+{horizon_min} min): {forecast} µg/m³ ({category_forecast})
+
+Match the verb to the direction: a rise is a spike, a fall is a drop. Do not
+describe a fall as a spike.
 """
 
 DRIFT_USER = """Write a short ops note: the monitored feature distribution has
