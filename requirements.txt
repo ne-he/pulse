@@ -4,8 +4,11 @@
 # ──────────────────────────────────────────────────────────────
 
 # Core / streaming brain
-river==0.21.1                # online / incremental ML (SNARIMAX, HalfSpaceTrees)
+river==0.21.1                # online / incremental ML (SNARIMAX)
 redis==5.0.4                 # Redis Streams bus
+fakeredis==2.37.0            # in-process bus for `python -m deploy.demo`
+                             # (REDIS_URL=memory://) so a demo needs no server.
+                             # Imported only in that mode, never in the container.
 pydantic==2.7.1             # event schemas
 pydantic-settings==2.2.1    # env config
 

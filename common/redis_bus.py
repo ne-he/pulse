@@ -18,8 +18,42 @@ from common.config import settings
 _MAXLEN = 5000
 
 
+# ── In-process bus: REDIS_URL=memory:// ────────────────────────────────
+# Runs the entire loop in ONE process with no Redis server, which is what
+# `python -m deploy.demo` uses so a demo needs no Docker and no install.
+# fakeredis is imported ONLY when this mode is selected, so the container image
+# and the deployed path never load it. It is a real Redis implementation, streams
+# and blocking XREAD included, not the write-only stub `InMemoryClient` below.
+_MEMORY_SCHEME = "memory://"
+_fake_server = None
+
+
+def _memory_mode() -> bool:
+    return settings.redis_url.startswith(_MEMORY_SCHEME)
+
+
+def _server():
+    """One shared server per process, so every client sees the same streams."""
+    global _fake_server
+    if _fake_server is None:
+        try:
+            import fakeredis
+        except ImportError as exc:  # pragma: no cover - install-time guidance
+            raise RuntimeError(
+                "REDIS_URL=memory:// needs the optional 'fakeredis' package.\n"
+                "  pip install fakeredis\n"
+                "Or point REDIS_URL at a real Redis server instead."
+            ) from exc
+        _fake_server = fakeredis.FakeServer()
+    return _fake_server
+
+
 # ── Sync side (workers) ────────────────────────────────────────────────
 def get_client() -> redis.Redis:
+    if _memory_mode():
+        import fakeredis
+
+        return fakeredis.FakeRedis(server=_server(), decode_responses=True)
     return redis.Redis.from_url(settings.redis_url, decode_responses=True)
 
 
@@ -79,6 +113,10 @@ class InMemoryClient:
 
 # ── Async side (API WebSocket fan-out) ─────────────────────────────────
 def get_async_client() -> aredis.Redis:
+    if _memory_mode():
+        import fakeredis.aioredis
+
+        return fakeredis.aioredis.FakeRedis(server=_server(), decode_responses=True)
     return aredis.Redis.from_url(settings.redis_url, decode_responses=True)
 
 

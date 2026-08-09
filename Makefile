@@ -1,6 +1,9 @@
 # Convenience targets. On Windows use: make via Git Bash, or run the commands directly.
 
-.PHONY: up down logs build sample lint test smoke fresh
+.PHONY: demo up down logs build sample lint test smoke fresh
+
+demo:          ## Whole system in one process, no Redis/Docker, opens the dashboard
+	python -m deploy.demo
 
 up:            ## Spin up the whole loop
 	docker compose up --build

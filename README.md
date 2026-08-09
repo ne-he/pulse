@@ -43,7 +43,7 @@ OpenAQ + Weather API  ──(replay or live)──►  Redis Stream  aq.events
   ml/online/consumer.py
         ├─► river: forecast PM2.5 (horizon) + uncertainty band
         ├─► river: learn_one(x, y)        ⭐ TRUE online update, per event (not batch)
-        └─► anomaly: HalfSpaceTrees → flag spikes
+        └─► anomaly: one-step surprise (robust z-score) → flag spikes
         │
         ├─► aq.predictions ──► API (WebSocket) ──► dashboard live chart
         ├─► aq.alerts ──► agent (Gemini) ──► aq.incidents ──► dashboard feed
@@ -60,8 +60,23 @@ new version → new model card** loop closes back on itself automatically.
 ## Quickstart
 
 ```bash
-cp .env.example .env          # defaults run in REPLAY mode — no keys, no internet
-docker compose up --build     # redis + ingestion + ml + agent + api
+pip install -r requirements.txt
+python -m deploy.demo          # everything, one process, then opens the dashboard
+```
+
+No Redis server, no Docker daemon, no API keys, no second terminal. The bus runs
+in-process and the API serves the dashboard itself, so the whole system is one command on
+one port. It also pre-loads 600 frames through the real engine before opening the browser,
+so the dashboard paints with history, a trained model, promoted versions and a populated
+incident feed instead of an empty screen. On Windows, double-click `demo.cmd`.
+
+Runbook, flags and a three-minute demo script: [`docs/DEMO.md`](docs/DEMO.md).
+
+### The full deployment shape
+
+```bash
+cp .env.example .env          # defaults run in REPLAY mode, no keys, no internet
+docker compose up --build     # redis + ingestion + ml + agent + api, as separate services
 ```
 
 Then:
@@ -132,18 +147,32 @@ here, and it is worth it modestly, not dramatically.
 | Event → prediction latency | **2.6 ms** median (p95 4.3 ms, p99 16.3 ms) |
 | Retrains per hour of replayed data | **0.069** (23 retrains over 335.8 h of data) |
 | Retrains per wall-clock hour at `REPLAY_SPEED=600` | **41** |
-| Events flagged as anomalies | **58.3%** (5,873 of 10,080) |
+| Events flagged as anomalies | **0.50%** (50 of 10,080), was 58.3% |
 
 Measured on the ML pipeline with an in-memory bus (forecast → `learn_one` → anomaly →
 drift → retrain), so Redis network time is excluded. These are the brain's numbers, not
 end-to-end service numbers.
 
-**The anomaly rate is a known problem, not a feature.** A detector that fires on 58% of
-events is not selecting anything, and shipped as-is it would turn the dashboard incident
-feed into noise. `anomaly_threshold = 0.85` is too loose for HalfSpaceTrees on this data.
-It is reported here rather than quietly retuned, because picking a new threshold is a
-calibration decision that should be made against a labelled set, not chosen to make a
-number look better. Detail in `docs/TEST_GAP_MAP.md` section 6b.
+**The 58.3% anomaly rate is fixed, and the fix was not a new threshold.** The old
+detector scored river's HalfSpaceTrees, whose output on this feed has mean 0.82 and
+median 0.90: it compresses almost every event into the top decile, so no cut point
+selects anything. The on-demand demo spike scored 0.9832 while ordinary events reached
+0.9964, meaning the injected spike was not even in the top percentile. Rescaling the
+features made saturation worse, not better.
+
+So the statistic changed rather than the knob. An anomaly is now the **one-step forecast
+surprise**: the persistence residual standardised by a robust (MAD-based) estimate of
+that station's normal step size, squashed as `score = z / (1 + z)` so the existing [0, 1]
+threshold still works and now converts directly to sigmas (`0.85` means `z >= 5.67`). A
+materiality floor suppresses anomalies in Good air, because a statistically odd reading of
+2 µg/m³ is not something an ops team acts on. Result: 0.50% of events flagged, zero false
+alarms over 500 events of a calm station, and a 10x spike caught on the event it happens
+instead of two events later.
+
+This is calibration by construction, not calibration against labels. There is still no
+labelled incident set for this feed, so the honest claim is "the score means something in
+sigmas and the rate is plausible", not "the detector is correct". Detail in
+`ml/online/anomaly.py` and `docs/TEST_GAP_MAP.md` section 6b.
 
 ---
 
