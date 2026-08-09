@@ -251,12 +251,65 @@ menguji hal nyata:
   yang menukar urutan score/learn atau mengganti scaler-nya, perubahan latensi deteksi
   muncul sebagai test merah, bukan regresi senyap.
 
-### b. Detektor anomali menyala di 58 persen event
+> **Catatan 2026-08-09:** keterlambatan dua event itu sudah hilang bersama pergantian
+> detektor di bagian 6b. Penyebabnya memang MinMaxScaler yang mengembalikan 0 selama
+> min == max, dan detektor residual tidak punya titik buta itu. Tes keduanya diganti nama
+> jadi `test_anomaly_detector_flags_spike_on_constant_signal_without_lag` dan sekarang
+> mengunci deteksi tepat di event 100.
+
+### b. Detektor anomali menyala di 58 persen event — SUDAH DIPERBAIKI (2026-08-09)
 
 `python -m scripts.bench` mencatat **5.873 anomali dari 10.080 event**. Kalau lebih dari
 separuh aliran data disebut anomali, kata itu kehilangan arti, dan feed insiden di
-dashboard akan jadi spam. `anomaly_threshold = 0.85` kelihatannya terlalu longgar untuk
-HalfSpaceTrees di data ini. Perlu kalibrasi ulang. **Tidak diubah.**
+dashboard jadi spam.
+
+Dugaan lama, bahwa `anomaly_threshold = 0.85` terlalu longgar, ternyata salah alamat.
+Masalahnya bukan di angka threshold-nya, tapi di **statistik yang dipakai buat memutuskan**.
+Skor HalfSpaceTrees di feed ini punya rata-rata 0.82 dan median 0.90, jadi hampir semua
+event tertumpuk di desil teratas dan tidak ada titik potong yang bisa menyeleksi apa pun.
+Buktinya: spike demo 120 µg/m³ dapat skor 0.9832, sementara event biasa mencapai 0.9964,
+jadi spike yang sengaja disuntik pun tidak masuk persentil teratas. Menyetel ulang scaling
+fitur malah memperparah kejenuhan (rata-rata naik ke 0.96), dan gerbang rolling-quantile
+juga tidak menolong karena distribusinya memang rapat di ujung atas.
+
+Jadi yang diganti statistiknya, bukan knob-nya. Anomali sekarang = **kejutan forecast satu
+langkah**: residual persistence dibagi estimasi robust (MAD) dari ukuran langkah normal
+stasiun itu, lalu dipadatkan jadi `score = z / (1 + z)` supaya threshold [0, 1] yang lama
+tetap berlaku dan sekarang bisa dibaca langsung dalam sigma (`0.85` artinya `z >= 5.67`).
+Ditambah lantai materialitas: anomali di udara kategori Good tidak dilaporkan, karena
+bacaan 2 µg/m³ yang aneh secara statistik tetap bukan insiden yang perlu ditindak.
+
+Hasil di sampel 10.080 event yang sama: **0,50 persen event ditandai** (dari 58,3 persen),
+nol alarm palsu di 500 event stasiun bersih, dan lonjakan 10x tertangkap di event kejadian
+itu sendiri (sebelumnya telat dua event).
+
+Yang **belum** selesai: masih belum ada labelled incident set buat feed ini. Jadi klaim
+jujurnya adalah "skornya sekarang punya arti dalam sigma dan rate-nya masuk akal", bukan
+"detektornya sudah benar". Kalibrasi berlabel tetap pekerjaan terbuka.
+
+Celah tesnya juga ditutup: suite lama cuma menguji sensitivitas (apakah spike tertangkap),
+tidak pernah menguji spesifisitas. Itu sebabnya detektor yang menyala di 58 persen event
+bisa duduk di repo dengan suite hijau. Sekarang ada
+`test_anomaly_detector_is_quiet_on_a_calm_feed`,
+`test_anomaly_detector_rate_stays_selective_across_regimes`, dan
+`test_anomaly_detector_ignores_odd_but_clean_air`.
+
+### b2. Kontrol demo tidak pernah sampai ke replay engine — SUDAH DIPERBAIKI (2026-08-09)
+
+`ingestion/replay.py` menguras control stream pakai `XREAD ... $` **tanpa BLOCK**. `$`
+berarti "id yang lebih besar dari maksimum stream saat pemanggilan", dan karena tidak
+blocking, tidak ada jeda buat id baru muncul: panggilan itu selalu balik kosong dan
+offset-nya tidak pernah maju. Akibatnya semua perintah `play`, `pause`, `set_speed`,
+`seek`, dan `trigger_spike` dibuang diam-diam.
+
+Ini bukan cacat kecil: tombol `[SPIKE]` adalah satu-satunya kontrol yang dipakai di skrip
+demo README, dan tombol itu tidak pernah berfungsi. Tidak ada yang menangkapnya karena
+tidak ada satu pun tes yang menyentuh jalur kontrol, dan kalau dicoba manual gejalanya
+cuma "replay-nya jalan terus", yang persis sama dengan tampilan sistem yang sehat.
+
+Diperbaiki dengan menyemai offset dari id terakhir stream (`control_start_offset`), yang
+tetap mempertahankan maksud aslinya, yaitu mengabaikan perintah yang dikirim sebelum
+worker ini hidup. Dikunci oleh `tests/test_replay_control.py`.
 
 ### c. `gen_sample.py` tidak sepenuhnya reproducible
 

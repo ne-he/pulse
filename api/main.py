@@ -8,9 +8,11 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from api.ws import ConnectionManager
 from common.config import Streams, settings
@@ -58,8 +60,35 @@ async def _consume_streams():
         await manager.broadcast({"type": kind, "data": data})
 
 
+async def _hydrate() -> None:
+    """Rebuild the snapshot from what is ALREADY on the bus before tailing it.
+
+    `_consume_streams` reads from `$`, so without this the API only knows what
+    happened after it personally started. Two things that breaks: an API restart
+    shows a blank dashboard until fresh frames trickle in, and a demo pre-roll
+    that warms the model before the server comes up is invisible. Bounded reads,
+    so a long-running stream costs the same at startup as a short one."""
+    try:
+        client = get_async_client()
+        for row in await recent(client, Streams.EVENTS, count=500):
+            if row.get("station_id"):
+                state["latest_obs"][row["station_id"]] = row
+        for row in await recent(client, Streams.PREDICTIONS, count=500):
+            if row.get("station_id"):
+                state["latest_pred"][row["station_id"]] = row
+        for row in await recent(client, Streams.ALERTS, count=50):
+            state["alerts"].appendleft(row)
+            if row.get("type") == "drift":
+                state["drift"] = row.get("context", {}).get("drift")
+        for row in await recent(client, Streams.INCIDENTS, count=50):
+            state["incidents"].appendleft(row)
+    except Exception as exc:  # noqa: BLE001 — never let a cold bus block startup
+        print(f"[api] snapshot hydrate skipped ({exc})")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await _hydrate()
     task = asyncio.create_task(_consume_streams())
     yield
     task.cancel()
@@ -193,3 +222,12 @@ async def websocket_endpoint(ws: WebSocket):
             await ws.receive_text()  # keepalive / ignore client messages
     except WebSocketDisconnect:
         await manager.disconnect(ws)
+
+
+# ── Dashboard (mounted LAST so it never shadows an API route) ─────────────
+# Serving the UI from the same origin as the API is what lets the demo be one
+# URL instead of two: the dashboard's default backend is its own origin, so
+# there is no CORS hop, no second server, and nothing to reconfigure.
+_DASHBOARD = Path(__file__).resolve().parent.parent / "Frontend_pulse"
+if _DASHBOARD.is_dir():
+    app.mount("/", StaticFiles(directory=str(_DASHBOARD), html=True), name="dashboard")
