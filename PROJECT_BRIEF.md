@@ -81,7 +81,7 @@ PULSE is a small distributed system, not one script. Services communicate over *
 | Streaming bus | **Redis Streams** | Simple, one container; real streaming without the weight of Kafka/Redpanda |
 | API + realtime | **FastAPI + WebSockets** | Async REST + push updates to the dashboard |
 | Drift monitoring | **PSI**, per station (`Evidently` selectable via `DRIFT_ENGINE`) | Evidently was measured against it and lost at this window size: 5/6 correct verdicts vs 6/6, flagging a station that had not moved |
-| LLM agent | **Gemini** (`gemini-2.0-flash`, template fallback) | Generous free tier; writes incident cards |
+| LLM agent | **Gemini** (`gemini-2.5-flash`, template fallback) | Generous free tier; writes incident cards |
 | Model registry | **Local JSON** (Supabase-ready) | Ships now; swap one file to go cloud later |
 | Packaging | **Docker Compose** | One command runs the whole system — recruiters can't run a notebook |
 | CI / automation | **GitHub Actions** | `ci.yml` (lint + test) and `retrain.yml` (scheduled/manual retrain) |

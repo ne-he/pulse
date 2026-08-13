@@ -54,7 +54,10 @@ class Settings(BaseSettings):
 
     # ── Agent ──────────────────────────────────────────────
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    # gemini-2.0-flash was retired and now 404s, which the agent's template fallback
+    # absorbed silently: every incident card in a demo was the template, and nothing
+    # said so except one line of log. Verified against the live API before changing.
+    gemini_model: str = "gemini-2.5-flash"
 
     # ── Registry ───────────────────────────────────────────
     registry_path: str = "./data/registry"
