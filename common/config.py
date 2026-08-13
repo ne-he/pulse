@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     # ── Drift / retrain ────────────────────────────────────
     drift_window: int = 200
     drift_threshold: float = 0.5
+    # psi | evidently. Explicit so local, CI and Render run the SAME detector;
+    # see the module docstring of ml/monitoring/drift.py for the measurement
+    # behind the default.
+    drift_engine: str = "psi"
 
     # ── Agent ──────────────────────────────────────────────
     gemini_api_key: str = ""
