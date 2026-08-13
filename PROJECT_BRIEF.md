@@ -71,7 +71,7 @@ PULSE is a small distributed system, not one script. Services communicate over *
 3. **Auto model cards.** Every model promotion produces a documentation card (metrics, reason, timestamp) — governance built in, not bolted on.
 4. **LLM incident narration.** An agent turns cold anomaly scores into calibrated, plain-language explanations grounded in the actual data ("likely traffic + low wind"), never inventing numbers.
 5. **Reproducible demo weapon (replay mode).** Jakarta isn't always spiking, so a recruiter opening the dashboard on a calm day would see nothing dramatic. Replay mode streams historical/synthetic data and lets you **trigger a pollution spike on demand** — so the spike → anomaly → incident-card moment is reproducible every single time someone is watching.
-6. **Never-break philosophy.** river, Evidently, and Gemini each have a graceful fallback (baseline model, PSI drift, template card). The system degrades instead of crashing — a production mindset.
+6. **Never-break philosophy.** river, Evidently, and Gemini each have a graceful fallback (baseline model, PSI drift, template card). The system degrades instead of crashing — a production mindset. The caveat learned the hard way: a fallback that nothing tests is indistinguishable from the thing it replaces, so each one is now asserted to have actually run.
 
 ## 8. Tech stack (and why each)
 
@@ -80,7 +80,7 @@ PULSE is a small distributed system, not one script. Services communicate over *
 | Online ML | **river** (SNARIMAX + weather/time exog features) | The one genuinely new skill; enables per-event incremental learning |
 | Streaming bus | **Redis Streams** | Simple, one container; real streaming without the weight of Kafka/Redpanda |
 | API + realtime | **FastAPI + WebSockets** | Async REST + push updates to the dashboard |
-| Drift monitoring | **Evidently** (with a PSI fallback) | Industry-standard drift reports |
+| Drift monitoring | **PSI**, per station (`Evidently` selectable via `DRIFT_ENGINE`) | Evidently was measured against it and lost at this window size: 5/6 correct verdicts vs 6/6, flagging a station that had not moved |
 | LLM agent | **Gemini** (`gemini-2.0-flash`, template fallback) | Generous free tier; writes incident cards |
 | Model registry | **Local JSON** (Supabase-ready) | Ships now; swap one file to go cloud later |
 | Packaging | **Docker Compose** | One command runs the whole system — recruiters can't run a notebook |
@@ -171,7 +171,7 @@ Drift means the incoming data's pattern has shifted away from what the model lea
 When an anomaly or drift is detected, the agent (Gemini) writes a short, calibrated, plain-language incident card — what changed, a likely cause grounded in the data, and the forecast outlook. It never invents numbers and hedges causes with "likely/possibly."
 
 **Q: What's the tech stack?**
-Python, river (online ML), Redis Streams, FastAPI + WebSockets, Evidently (drift), Gemini (incident cards), Docker Compose, GitHub Actions, and a dark ops dashboard.
+Python, river (online ML), Redis Streams, FastAPI + WebSockets, a per-station PSI drift detector (Evidently selectable), Gemini (incident cards), Docker Compose, GitHub Actions, and a dark ops dashboard.
 
 **Q: Is it deployed?**
 It runs end-to-end locally with one command. Public deployment is the current next step.

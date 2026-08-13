@@ -47,7 +47,7 @@ OpenAQ + Weather API  ──(replay or live)──►  Redis Stream  aq.events
         │
         ├─► aq.predictions ──► API (WebSocket) ──► dashboard live chart
         ├─► aq.alerts ──► agent (Gemini) ──► aq.incidents ──► dashboard feed
-        └─► drift (Evidently/PSI, windowed, PER STATION) ──► if any station drifts ──► retrain
+        └─► drift (PSI, windowed, PER STATION) ──► if any station drifts ──► retrain
                                                                     ──► registry + new model card
 ```
 
@@ -192,7 +192,8 @@ every time a recruiter is watching.
 ## Tech stack
 
 `Python` · **`river`** (online ML — the one new thing) · `Redis Streams` (bus) ·
-`FastAPI` + `WebSockets` · `Evidently` (drift, with PSI fallback) · `Gemini`
+`FastAPI` + `WebSockets` · PSI drift detector (`Evidently` wired up behind
+`DRIFT_ENGINE=evidently`, see below) · `Gemini`
 (incident cards, with deterministic template fallback) · local JSON model registry
 (Supabase-ready) · `Docker Compose` · static dc-runtime dashboard in `Frontend_pulse/`,
 served by nginx on port 3000 (the Next.js layout in `FRONTEND_SPEC.md` section 4 is a
@@ -218,7 +219,7 @@ pulsev2/
 ├── ml/
 │   ├── online/             # model (river SNARIMAX + baseline fallback), consumer, anomaly
 │   ├── batch/baseline.py   # M1 batch comparison
-│   ├── monitoring/drift.py # Evidently drift (+ PSI fallback)
+│   ├── monitoring/drift.py # PSI drift, per station (Evidently selectable)
 │   ├── registry/           # versioned model registry (local JSON)
 │   └── modelcard/          # auto model card per promotion
 ├── agent/                  # SERVICE 2 — Gemini incident cards (+ template fallback)
@@ -240,7 +241,7 @@ pulsev2/
 
 - **M1 — Foundation:** ingestion + replay + baseline forecast with uncertainty. *(scaffold done)*
 - **M2 — Online core:** river incremental updates + anomaly detection + live dashboard.
-- **M3 — Lifecycle:** Evidently drift + auto-retrain + registry + model cards. *(loop wired)*
+- **M3 — Lifecycle:** drift detection + auto-retrain + registry + model cards. *(loop wired)*
 - **M4 — Agent + launch:** Gemini incident cards + alerting + deploy + README/GIF/build log.
 
 Target: ship and deploy publicly in ~8–10 weeks. Don't let it become version four
@@ -286,4 +287,38 @@ Keep decisions, trade-offs, and failures here — it's ~30% of the recruiter val
   Suite went from 6 tests in 1 file to 27 in 4 files, all green. Added a real error curve
   and a real benchmark, both from actual replays. See `docs/TEST_GAP_MAP.md` for what is
   still uncovered, and `docs/METRICS.md` for the numbers, including where the model loses.
-```
+
+- **2026-08-13**: CI had been red on every run since the first one, and the reason was
+  the last gap `docs/TEST_GAP_MAP.md` listed: the Evidently branch was never tested
+  directly, so the PSI fallback covered for it.
+
+  **The drift detector depended on the environment, not on a decision.** `check_drift`
+  was "try Evidently, fall back to PSI on any error". This repo keeps its venv inside
+  the project directory, and nltk, pulled in transitively by Evidently, refuses to
+  import anything resolving inside the working directory. So every local run silently
+  took the PSI branch while CI, Docker and Render took the Evidently one. Same commit,
+  two different detectors, and the only symptom was a red CI badge.
+
+  **The Evidently branch had never worked.** `DataDriftPreset` expands into several
+  metrics whose order is not contractual. The code read `metrics[0]`, which is
+  `DatasetDriftMetric` and has no feature table at all, so `per_feature` came back
+  empty every time Evidently actually ran, and the model card, the API and the
+  dashboard all read that field. Now the metric is selected by the key it must carry,
+  and an empty table raises instead of quietly propagating.
+
+  **PSI is now the explicit default, chosen by measurement.** Left alone, Evidently
+  picks two-sample K-S at this window and reports the p-value as `drift_score`, which
+  inverts what every consumer reads: high means drift here, but a low p-value means
+  drift there. It also flagged all four pooled features and a station that had not
+  moved, because at n=1000 K-S rejects on differences too small to act on. Pinning
+  Evidently to `stattest="psi"` at the same 0.2 threshold fixes the semantics but not
+  the calibration: on six cases from the sample generator (five calm-vs-calm windows
+  that must not drift, one calm-vs-polluted that must), the in-house quantile-binned
+  PSI got 6/6 with every calm score at most 0.190, just under the line, while
+  Evidently's PSI got 5/6, flagging calm `jaksel` at humidity 0.496. At
+  `drift_window=200` the quantile version has the tighter null distribution, and a
+  false retrain costs a bogus model version plus a re-baselined reference window.
+  `DRIFT_ENGINE` selects the engine; Evidently stays wired up and is now tested
+  directly in `tests/test_drift_engines.py`, including that it actually ran.
+
+  Suite: 41 tests, green with Evidently importable and 37 plus 4 skips without it.

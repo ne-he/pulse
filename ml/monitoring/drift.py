@@ -1,9 +1,32 @@
 """Drift monitoring — closes the loop. When the live feature distribution drifts
 away from the reference window, this fires the signal that triggers retraining.
 
-Primary engine: Evidently (DataDriftPreset). If Evidently's API differs across
-versions, we fall back to a dependency-light PSI (Population Stability Index) so
-the closed loop keeps working. Either way we return a consistent shape."""
+Two engines are implemented and `DRIFT_ENGINE` picks one explicitly. The default
+is the PSI (Population Stability Index) implementation in this file; Evidently is
+available with `DRIFT_ENGINE=evidently`. Both return the same shape, and `engine`
+in the report says which one produced the numbers.
+
+Why the in-house one is the default, since Evidently is the industry-standard
+tool and shipping it would read better on paper:
+
+1. Left to itself Evidently picks a stat test per column from the sample size,
+   and at our window it picks two-sample K-S, whose `drift_score` is a p-value.
+   That inverts the meaning of the number every consumer reads: under PSI a HIGH
+   score means drift, under a p-value a LOW one does. It also flagged all four
+   pooled features and a station that had not moved, because at n=1000 K-S
+   rejects on differences too small to act on. So the Evidently path below pins
+   `stattest="psi"` at the same threshold instead of accepting the default.
+2. Even pinned to PSI the two disagree, because Evidently bins differently while
+   `_psi` cuts on reference QUANTILES. Measured on six cases from the sample
+   generator (five calm-vs-calm windows that must not drift, one calm-vs-polluted
+   that must), quantile PSI got 6/6 right with every calm score at most 0.190,
+   just under the 0.2 line. Evidently's PSI got 5/6, flagging calm `jaksel` at
+   humidity 0.496 and wind_speed 0.236. At drift_window=200 the quantile version
+   simply has the tighter null distribution, and a false retrain costs a bogus
+   model version plus a re-baselined reference window.
+
+Evidently stays wired up and tested (`tests/test_drift_engines.py`) so the claim
+is checked rather than asserted, and so the choice can be revisited with data."""
 from __future__ import annotations
 
 import math
@@ -13,6 +36,9 @@ import pandas as pd
 from common.config import settings
 
 FEATURES = ["pm25", "temp", "humidity", "wind_speed"]
+
+# Standard PSI rule of thumb. Shared by both engines so they cannot drift apart.
+PSI_DRIFT_THRESHOLD = 0.2
 
 
 def _psi(ref: pd.Series, cur: pd.Series, bins: int = 10) -> float:
@@ -43,7 +69,7 @@ def _drift_psi(reference: pd.DataFrame, current: pd.DataFrame) -> dict:
     for col in FEATURES:
         if col in reference and col in current:
             score = _psi(reference[col], current[col])
-            is_drift = score > 0.2  # standard PSI rule of thumb
+            is_drift = score > PSI_DRIFT_THRESHOLD
             per_feature[col] = {"score": round(score, 4), "drifted": is_drift}
             drifted += int(is_drift)
     share = drifted / max(1, len(per_feature))
@@ -60,17 +86,46 @@ def _drift_evidently(reference: pd.DataFrame, current: pd.DataFrame) -> dict:
     from evidently.metric_preset import DataDriftPreset
     from evidently.report import Report
 
-    report = Report(metrics=[DataDriftPreset()])
+    report = Report(
+        metrics=[
+            DataDriftPreset(
+                stattest="psi",
+                stattest_threshold=PSI_DRIFT_THRESHOLD,
+            )
+        ]
+    )
     report.run(reference_data=reference[FEATURES], current_data=current[FEATURES])
-    result = report.as_dict()["metrics"][0]["result"]
+
+    # DataDriftPreset expands into several metrics and their order is not part of
+    # Evidently's contract. Only DataDriftTable carries `drift_by_columns`, and it is
+    # not the first one: DatasetDriftMetric is, and that one has no feature table at
+    # all. Reading `metrics[0]` therefore returned an empty `per_feature` every time
+    # Evidently actually ran, which the model card, the API and the dashboard all
+    # read. Select the metric by the key we need, never by position.
+    result = next(
+        (
+            m["result"]
+            for m in report.as_dict()["metrics"]
+            if "drift_by_columns" in m.get("result", {})
+        ),
+        None,
+    )
+    if result is None:
+        raise KeyError("no Evidently metric exposed `drift_by_columns`")
+
     share = float(result.get("share_of_drifted_columns", 0.0))
     per_feature = {
         col: {
             "score": round(float(info.get("drift_score", 0.0)), 4),
             "drifted": bool(info.get("drift_detected", False)),
         }
-        for col, info in result.get("drift_by_columns", {}).items()
+        for col, info in result["drift_by_columns"].items()
     }
+    if not per_feature:
+        # An empty table silently breaks every consumer downstream. Fail here so
+        # `check_drift` falls back to PSI, which always returns a populated table.
+        raise ValueError("Evidently returned an empty feature table")
+
     return {
         "engine": "evidently",
         "share_drifted": round(share, 3),
@@ -84,8 +139,19 @@ _evidently_warned = False
 
 
 def check_drift(reference: pd.DataFrame, current: pd.DataFrame) -> dict:
-    """Return a drift report. Tries Evidently, falls back to PSI on any error."""
+    """Return a drift report from the configured engine, PSI if it is not reachable.
+
+    The engine is read from config rather than discovered at runtime. It used to be
+    "try Evidently, fall back to PSI on any error", which made the detector depend on
+    the environment instead of on a decision: this repo keeps its venv inside the
+    project directory, and one of Evidently's transitive imports refuses to load from
+    the working directory, so every local run silently took the PSI branch while CI,
+    Docker and Render took the Evidently one. Same commit, two different detectors,
+    and the difference only ever showed up as a red CI job.
+    """
     global _evidently_warned
+    if settings.drift_engine != "evidently":
+        return _drift_psi(reference, current)
     try:
         return _drift_evidently(reference, current)
     except Exception as exc:  # noqa: BLE001

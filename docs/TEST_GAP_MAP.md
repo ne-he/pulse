@@ -207,9 +207,22 @@ jadi dua test setelah akar masalahnya diukur. Ceritanya di bagian 6a.
 - `api/main.py`: 12 route REST plus WebSocket, nol test. Butuh `fastapi.testclient` plus fake
   Redis async. Sekitar 2 jam kerja.
 - `ingestion/producer.py`: jalur live polling OpenAQ dan Open-Meteo, nol test. Butuh mock httpx.
-- `ml/monitoring/drift.py` jalur Evidently: hanya diuji tidak langsung. Kalau Evidently ganti
+- ~~`ml/monitoring/drift.py` jalur Evidently: hanya diuji tidak langsung. Kalau Evidently ganti
   API, fallback PSI menyelamatkan tanpa ada yang tahu. Idealnya ada satu test yang memaksa
-  jalur Evidently dan gagal keras kalau ia tidak dipakai.
+  jalur Evidently dan gagal keras kalau ia tidak dipakai.~~
+  **LUNAS 13 Agu 2026**, dan tebakan di atas ternyata terlalu optimis. Jalurnya bukan "kalau
+  suatu saat Evidently ganti API", tapi memang sudah rusak sejak awal: `DataDriftPreset`
+  mekar jadi beberapa metric dan urutannya bukan kontrak, sedangkan kodenya baca
+  `metrics[0]` yaitu `DatasetDriftMetric` yang tidak punya tabel fitur sama sekali. Jadi
+  `per_feature` selalu kosong setiap kali Evidently benar-benar jalan, dan model card, API,
+  serta dashboard semuanya baca field itu. Tidak ketahuan di lokal karena venv repo ini ada
+  di dalam folder projek dan nltk (ikut kebawa Evidently) menolak impor apa pun yang
+  resolve-nya di dalam working directory, jadi run lokal selalu ambil cabang PSI. CI ambil
+  cabang Evidently, dan merah di keenam run tanpa ada yang membaca lognya.
+  Sekarang ada `tests/test_drift_engines.py` yang memaksa jalur itu **dan** memastikan ia
+  betul-betul dipakai (`engine == "evidently"`), karena tanpa assert itu fallback diam-diam
+  tetap lulus. Engine-nya juga jadi pilihan eksplisit lewat `DRIFT_ENGINE`, bukan hasil
+  tebakan environment.
 - `common/schemas.py`: validasi `Literal` tidak pernah diuji.
 
 ## 6. Masalah yang dilaporkan, TIDAK dikerjakan
