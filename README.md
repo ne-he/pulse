@@ -8,29 +8,20 @@ app_port: 7860
 pinned: false
 ---
 
-<!-- LIVE URL: isi setelah deploy. Ganti seluruh baris "Live demo" di bawah dengan URL asli, contoh:
-     **Live demo:** https://pulse-jakarta.vercel.app  ·  backend: https://ne-he-pulse-backend.hf.space
-     Slot ini sengaja ditaruh di bawah frontmatter, bukan di baris 1 file, karena baris 1 harus
-     tetap `---` supaya Hugging Face Spaces bisa membaca konfigurasi sdk/app_port di atas. -->
-**Live demo:** *(belum di-deploy, lihat [`docs/DEPLOY.md`](docs/DEPLOY.md))*
+**Live demo:** none, on purpose. PULSE runs as a self-contained local demo: `python -m deploy.demo`
+starts the whole system in one process, with no Redis server, no Docker and no API keys
+(see [Quickstart](#quickstart)).
 
-# PULSE — Jakarta Air Quality, after deploy
+# PULSE: Jakarta Air Quality, after deploy
 
 **Real-time air-quality intelligence for Jakarta: stream → online forecast →
 anomaly detection → drift-triggered retraining → auto model card → LLM incident
 card. One `docker compose up`.**
 
-> **Flagship commitment:** PULSE is the single flagship project. The RAG résumé
-> chatbot is parked until PULSE ships and is deployed publicly.
-
 Most ML portfolios stop at *"I trained a model."* PULSE is about **what happens
 after deploy**: the model keeps learning per-event, monitors itself for drift,
 retrains and re-documents itself when the world changes, and narrates anomalies in
 plain language. On real, local, streaming Jakarta data.
-
-<!-- TODO: drop the demo GIF here once the dashboard MVP is green:
-     spike button → chart jumps → incident card appears -->
-<!-- ![PULSE demo](docs/demo.gif) -->
 
 ---
 
@@ -80,7 +71,7 @@ docker compose up --build     # redis + ingestion + ml + agent + api, as separat
 ```
 
 Then:
-- **Dashboard: http://localhost:3000** — the live ops center (Jakarta AQ, forecast
+- **Dashboard: http://localhost:3000**: the live ops center (Jakarta AQ, forecast
   chart, incident feed, demo controls). Served automatically by the `dashboard` service.
 - API + interactive docs: **http://localhost:8000/docs**
 - Health: **http://localhost:8000/health**
@@ -191,7 +182,7 @@ every time a recruiter is watching.
 
 ## Tech stack
 
-`Python` · **`river`** (online ML — the one new thing) · `Redis Streams` (bus) ·
+`Python` · **`river`** (online ML, the one new thing) · `Redis Streams` (bus) ·
 `FastAPI` + `WebSockets` · PSI drift detector (`Evidently` wired up behind
 `DRIFT_ENGINE=evidently`, see below) · `Gemini`
 (incident cards, with deterministic template fallback) · local JSON model registry
@@ -204,7 +195,7 @@ plan, not what ships) ·
 - **Redis Streams**, not Redpanda.
 - **Local JSON registry**, not Supabase yet (swap only `ml/registry/registry.py`).
 - **DVC** wired later; sample data generator stands in for now.
-- The one genuinely new thing — **streaming + online learning (river)** — is where
+- The one genuinely new thing, **streaming + online learning (river)**, is where
   the effort goes.
 
 ---
@@ -215,15 +206,15 @@ plan, not what ships) ·
 pulsev2/
 ├── docker-compose.yml      # one command runs the whole loop
 ├── common/                 # shared contract: config, schemas, redis bus, AQI health
-├── ingestion/              # SERVICE 1 — producer (live) + replay (demo) + sample gen
+├── ingestion/              # SERVICE 1: producer (live) + replay (demo) + sample gen
 ├── ml/
 │   ├── online/             # model (river SNARIMAX + baseline fallback), consumer, anomaly
 │   ├── batch/baseline.py   # M1 batch comparison
 │   ├── monitoring/drift.py # PSI drift, per station (Evidently selectable)
 │   ├── registry/           # versioned model registry (local JSON)
 │   └── modelcard/          # auto model card per promotion
-├── agent/                  # SERVICE 2 — Gemini incident cards (+ template fallback)
-├── api/                    # SERVICE 3 — FastAPI REST + WebSocket + demo control
+├── agent/                  # SERVICE 2: Gemini incident cards (+ template fallback)
+├── api/                    # SERVICE 3: FastAPI REST + WebSocket + demo control
 ├── Frontend_pulse/         # SERVICE 4: the dashboard (+ FRONTEND_SPEC.md contract)
 ├── tools/devboard.html     # throwaway harness to watch the backend live
 ├── scripts/
@@ -239,10 +230,10 @@ pulsev2/
 
 ## Milestones
 
-- **M1 — Foundation:** ingestion + replay + baseline forecast with uncertainty. *(scaffold done)*
-- **M2 — Online core:** river incremental updates + anomaly detection + live dashboard.
-- **M3 — Lifecycle:** drift detection + auto-retrain + registry + model cards. *(loop wired)*
-- **M4 — Agent + launch:** Gemini incident cards + alerting + deploy + README/GIF/build log.
+- **M1, Foundation:** ingestion + replay + baseline forecast with uncertainty. *(scaffold done)*
+- **M2, Online core:** river incremental updates + anomaly detection + live dashboard.
+- **M3, Lifecycle:** drift detection + auto-retrain + registry + model cards. *(loop wired)*
+- **M4, Agent + launch:** Gemini incident cards + alerting + deploy + README/GIF/build log.
 
 Target: ship and deploy publicly in ~8–10 weeks. Don't let it become version four
 of a portfolio that never launched.
@@ -251,9 +242,9 @@ of a portfolio that never launched.
 
 ## Build log
 
-Keep decisions, trade-offs, and failures here — it's ~30% of the recruiter value.
+Keep decisions, trade-offs, and failures here: it's ~30% of the recruiter value.
 
-- **2026-06-22** — Scaffolded the full walking skeleton: all services connect
+- **2026-06-22**: Scaffolded the full walking skeleton: all services connect
   end-to-end in replay mode; offline smoke + unit tests green. river/Evidently/Gemini
   each have a graceful fallback so the loop never hard-fails. Next: build the dashboard
   MVP (live chart + status header + station selector + incident feed).
