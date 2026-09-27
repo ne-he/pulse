@@ -1,4 +1,4 @@
-"""Pydantic event schemas — the typed contract that flows through the streams.
+"""Pydantic event schemas: the typed contract that flows through the streams.
 
 Every message on the bus is one of these, serialized to JSON. The dashboard's
 TypeScript types should mirror these exactly (see Frontend_pulse/FRONTEND_SPEC.md)."""
@@ -29,7 +29,7 @@ class AQEvent(BaseModel):
     station_id: str
     station_name: str
     ts: str = Field(default_factory=_now_iso)        # ISO-8601 UTC
-    pm25: float                                       # µg/m³ — our forecast target
+    pm25: float                                       # µg/m³: our forecast target
     pm10: float | None = None
     no2: float | None = None
     o3: float | None = None

@@ -1,4 +1,4 @@
-"""Drift monitoring — closes the loop. When the live feature distribution drifts
+"""Drift monitoring: closes the loop. When the live feature distribution drifts
 away from the reference window, this fires the signal that triggers retraining.
 
 Two engines are implemented and `DRIFT_ENGINE` picks one explicitly. The default

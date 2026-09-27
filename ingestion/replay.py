@@ -1,8 +1,8 @@
-"""Replay engine — THE demo weapon (frontend feature #9).
+"""Replay engine: THE demo weapon (frontend feature #9).
 
 Streams a historical/synthetic CSV onto the bus as if it were happening live,
 time-compressed by REPLAY_SPEED. Listens on the control stream so the dashboard
-can pause/play, change speed, seek, and — crucially — TRIGGER A SPIKE on demand,
+can pause/play, change speed, seek, and, crucially, TRIGGER A SPIKE on demand,
 so the spike→anomaly→agent-card moment is reproducible whenever a recruiter looks.
 """
 from __future__ import annotations

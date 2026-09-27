@@ -1,4 +1,4 @@
-"""WebSocket connection manager — fan-out live frames to every connected client."""
+"""WebSocket connection manager: fan-out live frames to every connected client."""
 from __future__ import annotations
 
 import asyncio
@@ -30,7 +30,7 @@ class ConnectionManager:
         for ws in list(self.active):
             try:
                 await ws.send_text(data)
-            except Exception:  # noqa: BLE001 — client gone
+            except Exception:  # noqa: BLE001 (client gone)
                 dead.append(ws)
         if dead:
             async with self._lock:

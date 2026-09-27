@@ -1,4 +1,4 @@
-"""Consumer — the beating heart of PULSE. Reads events, forecasts, learns online,
+"""Consumer: the beating heart of PULSE. Reads events, forecasts, learns online,
 flags anomalies, watches for drift, and closes the loop by retraining + minting a
 new model version and card. Emits predictions and alerts back onto the bus.
 
@@ -225,7 +225,7 @@ def run(engine: Engine | None = None) -> None:
         for _stream, _id, event in reader.read(block_ms=5000):
             try:
                 engine.process(client, event)
-            except Exception as exc:  # noqa: BLE001 — one bad event must not kill the loop
+            except Exception as exc:  # noqa: BLE001 (one bad event must not kill the loop)
                 print(f"[ml] process error: {exc}")
 
 

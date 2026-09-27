@@ -1,4 +1,4 @@
-"""Live ingestion — poll real Jakarta air quality + weather, push to the bus.
+"""Live ingestion: poll real Jakarta air quality + weather, push to the bus.
 
 Primary source: OpenAQ v3 (needs a free API key). Fallback: Open-Meteo's keyless
 air-quality API, so `live` mode still works out of the box for a demo. Weather
@@ -29,7 +29,7 @@ def _weather(lat: float, lon: float) -> dict:
             "humidity": cur.get("relative_humidity_2m"),
             "wind_speed": cur.get("wind_speed_10m"),
         }
-    except Exception as exc:  # noqa: BLE001 — degrade gracefully, never crash the stream
+    except Exception as exc:  # noqa: BLE001 (degrade gracefully, never crash the stream)
         print(f"[producer] weather fetch failed: {exc}")
         return {"temp": None, "humidity": None, "wind_speed": None}
 

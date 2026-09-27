@@ -1,4 +1,4 @@
-"""Thin wrapper over Redis Streams — the only infra dependency of the loop.
+"""Thin wrapper over Redis Streams, the only infra dependency of the loop.
 
 Every message is stored as a single ``data`` field holding a JSON string, so any
 pydantic model can flow through unchanged. Sync helpers power the ingestion / ml /

@@ -1,4 +1,4 @@
-"""Central config — every service reads settings from here (12-factor: env-driven).
+"""Central config: every service reads settings from here (12-factor: env-driven).
 
 Defaults are chosen so the walking skeleton runs with ZERO setup: replay mode,
 no API keys, local JSON registry. Override via .env for live data / Gemini."""
@@ -70,7 +70,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-# ── Redis Stream names — THE contract. Don't hardcode these elsewhere. ──
+# ── Redis Stream names: THE contract. Don't hardcode these elsewhere. ──
 class Streams:
     EVENTS = "aq.events"            # raw observations from ingestion
     PREDICTIONS = "aq.predictions"  # forecasts + uncertainty + live metrics

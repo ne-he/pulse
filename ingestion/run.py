@@ -1,4 +1,4 @@
-"""Ingestion entrypoint — picks replay (demo) or live based on INGEST_MODE."""
+"""Ingestion entrypoint: picks replay (demo) or live based on INGEST_MODE."""
 from __future__ import annotations
 
 from common.config import settings

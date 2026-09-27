@@ -94,7 +94,7 @@ def warm_up(frames: int):
         publish(client, Streams.EVENTS, event)
         try:
             engine.process(client, event.model_dump())
-        except Exception as exc:  # noqa: BLE001 — a bad row must not abort the demo
+        except Exception as exc:  # noqa: BLE001 (a bad row must not abort the demo)
             print(f"[demo] warm-up skipped an event ({exc})")
 
     # Alerts only become incident cards when the agent sees them, and the agent

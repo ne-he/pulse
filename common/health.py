@@ -1,7 +1,7 @@
 """US EPA AQI conversion + health categories for PM2.5.
 
 Lets the dashboard show real, color-coded health bands ("Unhealthy", etc.)
-instead of raw µg/m³ numbers — the local, human-meaningful framing recruiters
+instead of raw µg/m³ numbers, the local, human-meaningful framing recruiters
 and users actually read."""
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ _PM25_BREAKPOINTS = [
     (350.5, 500.4, 401, 500),
 ]
 
-# Category metadata — name + hex color the dashboard can use directly.
+# Category metadata: name + hex color the dashboard can use directly.
 CATEGORIES = [
     (0, 50, "Good", "#00E400"),
     (51, 100, "Moderate", "#FFFF00"),

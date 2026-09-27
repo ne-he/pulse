@@ -1,4 +1,4 @@
-"""Offline end-to-end smoke test — no Redis, no Docker, no keys required.
+"""Offline end-to-end smoke test: no Redis, no Docker, no keys required.
 
 Runs the pure-Python pipeline (forecast → learn → anomaly → drift → retrain card
 → agent narrative) on synthetic data and asserts each stage produces sane output.
@@ -74,17 +74,17 @@ def main() -> None:
         assert reg.active()["version"] == rec["version"]
         print(f"[smoke] registry promoted {rec['version']}, model card {len(card)} chars")
 
-    # agent (template path — no Gemini key needed)
+    # agent (template path: no Gemini key needed)
     incident = build_incident({
         "alert_id": "test", "station_id": "jaksel", "type": "anomaly", "severity": "warning",
         "pm25": 130, "ts": events[-1]["ts"],
         "context": {"station_name": "Jakarta Selatan", "aqi_now": 180, "category": "Unhealthy",
                     "wind_speed": 0.5, "forecast": 95, "category_forecast": "Unhealthy", "horizon_min": 60},
     })
-    print(f"[smoke] incident ({incident.generated_by}): {incident.title} — {incident.body[:80]}…")
+    print(f"[smoke] incident ({incident.generated_by}): {incident.title}: {incident.body[:80]}…")
     assert incident.body, "agent must produce a narrative"
 
-    print("\n[smoke] ✅ ALL STAGES PASSED — the loop is wired up.")
+    print("\n[smoke] ✅ ALL STAGES PASSED, the loop is wired up.")
 
 
 if __name__ == "__main__":

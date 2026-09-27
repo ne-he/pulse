@@ -1,4 +1,4 @@
-"""Model registry — local JSON now, Supabase later (swap only this file).
+"""Model registry: local JSON now, Supabase later (swap only this file).
 
 Every promotion writes an immutable version record (metrics + reason + timestamp)
 and updates `active.json`. This is the 'what happened after deploy' paper trail:

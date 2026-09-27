@@ -270,7 +270,7 @@ menguji hal nyata:
 > jadi `test_anomaly_detector_flags_spike_on_constant_signal_without_lag` dan sekarang
 > mengunci deteksi tepat di event 100.
 
-### b. Detektor anomali menyala di 58 persen event — SUDAH DIPERBAIKI (2026-08-09)
+### b. Detektor anomali menyala di 58 persen event: SUDAH DIPERBAIKI (2026-08-09)
 
 `python -m scripts.bench` mencatat **5.873 anomali dari 10.080 event**. Kalau lebih dari
 separuh aliran data disebut anomali, kata itu kehilangan arti, dan feed insiden di
@@ -307,7 +307,7 @@ bisa duduk di repo dengan suite hijau. Sekarang ada
 `test_anomaly_detector_rate_stays_selective_across_regimes`, dan
 `test_anomaly_detector_ignores_odd_but_clean_air`.
 
-### b2. Kontrol demo tidak pernah sampai ke replay engine — SUDAH DIPERBAIKI (2026-08-09)
+### b2. Kontrol demo tidak pernah sampai ke replay engine: SUDAH DIPERBAIKI (2026-08-09)
 
 `ingestion/replay.py` menguras control stream pakai `XREAD ... $` **tanpa BLOCK**. `$`
 berarti "id yang lebih besar dari maksimum stream saat pemanggilan", dan karena tidak

@@ -1,4 +1,4 @@
-# PULSE Dashboard — Frontend Spec (build this part)
+# PULSE Dashboard: Frontend Spec (build this part)
 
 > **Note (2026-08-02):** this file used to live in a second, otherwise empty `dashboard/`
 > folder. The repo now has exactly one dashboard folder, `Frontend_pulse/`, which is the
@@ -9,15 +9,15 @@
 
 > This is an **ops / monitoring dashboard**, not a marketing landing page. Dark,
 > data-dense, fast. Saturn Protocol vibe is welcome (deep charcoal bg, **Lava
-> Orange `#FF4500`** accents) but **function first** — the hero is a live chart, not
+> Orange `#FF4500`** accents) but **function first**: the hero is a live chart, not
 > a hero image. Don't polish UI before the data flows.
 >
 > The backend is **done and running**. You only build the dashboard. Everything you
-> need is the API + WebSocket contract below — no guessing.
+> need is the API + WebSocket contract below, no guessing.
 
 ---
 
-## 0. TL;DR — what to build
+## 0. TL;DR: what to build
 
 A single-page (or 2-page) Next.js app that:
 1. Opens **one WebSocket** to `ws://localhost:8000/ws`, receives a `snapshot` on
@@ -27,8 +27,8 @@ A single-page (or 2-page) Next.js app that:
 4. (Phase 2) Adds **model health**, **drift monitor**, **model card viewer**,
    **version history**, and the **replay/demo control** (the secret weapon).
 
-There's a throwaway reference implementation in [`tools/devboard.html`](../tools/devboard.html)
-— open it after `docker compose up` to see the exact data shapes live. Don't ship
+There's a throwaway reference implementation in [`tools/devboard.html`](../tools/devboard.html).
+Open it after `docker compose up` to see the exact data shapes live. Don't ship
 it; it's just proof the backend works and a shape reference.
 
 ---
@@ -60,7 +60,7 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
 Base REST URL: `http://localhost:8000`. CORS is open. Interactive API docs live at
 `http://localhost:8000/docs` once the backend is up.
 
-### 2.1 WebSocket — `GET ws://localhost:8000/ws`
+### 2.1 WebSocket: `GET ws://localhost:8000/ws`
 
 Every message is an envelope:
 ```ts
@@ -85,7 +85,7 @@ interface Snapshot {
 }
 ```
 After that, handle each delta type and update your store. `prediction` arrives most
-often (one per event per station) — that's what drives the live chart.
+often (one per event per station), that's what drives the live chart.
 
 > Send anything (e.g. a `"ping"` string) periodically if you want; the server
 > ignores inbound messages. Auto-reconnect on close (see devboard.html for the pattern).
@@ -164,7 +164,7 @@ interface DriftReport {
 | GET | `/drift/status` | `{latest: DriftReport, threshold}` | drift monitor |
 | POST | `/control` | `{ok, sent}` | **demo controls** |
 
-### 2.4 Demo control — `POST /control`
+### 2.4 Demo control: `POST /control`
 
 Body = `ControlCommand`:
 ```ts
@@ -191,7 +191,7 @@ fetch(`${API}/control`, {method:"POST", headers:{"Content-Type":"application/jso
 Health-band colors (use these so chart + badges match the backend AQI scale):
 `Good #00E400 · Moderate #FFFF00 · Unhealthy(Sensitive) #FF7E00 · Unhealthy #FF0000 · Very Unhealthy #8F3F97 · Hazardous #7E0023`
 
-### 🟢 MVP — build these first, in this order
+### 🟢 MVP: build these first, in this order
 
 **C1. LiveForecastChart** *(the hero)*
 - X = time, Y = PM2.5. Three series: **actual** (solid line, from `observation`/
@@ -215,28 +215,28 @@ Health-band colors (use these so chart + badges match the backend AQI scale):
   and a small `generated_by` badge (`gemini` / `template`). Animate new items in.
 - Seed from snapshot `incidents`; append on `incident` WS messages.
 
-### 🟡 Phase 2 — the differentiators (this is what recruiters rarely see)
+### 🟡 Phase 2: the differentiators (this is what recruiters rarely see)
 
-**C5. ModelHealthPanel** — active `model_version`, live rolling **MAE/RMSE**, and a
+**C5. ModelHealthPanel**: active `model_version`, live rolling **MAE/RMSE**, and a
 pulsing "learning…" indicator driven by `n_seen` increasing. Source: `/model/metrics`
 + live `prediction` deltas.
 
-**C6. DriftMonitor** — `/drift/status`: show `share_drifted`, a per-feature list
+**C6. DriftMonitor** (`/drift/status`): show `share_drifted`, a per-feature list
 (which features drifted), engine badge, and a small **drift→retrain timeline**
 (each `alert` with `type:"drift"` = a retrain event).
 
-**C7. ModelCardViewer** — pick a version, `GET /modelcard/{version}`, render the
+**C7. ModelCardViewer**: pick a version, `GET /modelcard/{version}`, render the
 returned markdown (use `react-markdown`).
 
-**C8. VersionHistory** — `GET /model/versions`: table of version, MAE/RMSE, reason,
+**C8. VersionHistory** (`GET /model/versions`): table of version, MAE/RMSE, reason,
 `created_at` ("promoted at"). Clicking a row opens its model card (C7).
 
-**C9. ReplayControl** *(⭐ secret weapon)* — play / pause / speed slider / **"Trigger
+**C9. ReplayControl** *(⭐ secret weapon)*: play / pause / speed slider / **"Trigger
 Spike" button** per station, all via `POST /control`. This makes the
-spike→anomaly→incident moment reproducible on demand. **Build this — it's the
+spike→anomaly→incident moment reproducible on demand. **Build this, it's the
 highest-ROI feature for the demo.**
 
-### 🔵 Polish — last
+### 🔵 Polish: last
 
 **C10.** Incident detail modal, **About/Architecture page** (embed the README
 diagram; doubles as the recruiter explainer), responsive/mobile, full dark mode,
@@ -273,7 +273,7 @@ dashboard/
 
 ### The one hook everything hangs off (`usePulseSocket.ts`)
 ```ts
-// pseudocode — open WS, on "snapshot" hydrate store, on deltas update store,
+// pseudocode: open WS, on "snapshot" hydrate store, on deltas update store,
 // auto-reconnect on close. Components read from the store; they never touch the WS.
 ```
 

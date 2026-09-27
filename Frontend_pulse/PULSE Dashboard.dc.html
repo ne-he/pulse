@@ -87,7 +87,7 @@
       <!-- CHART -->
       <div style="position:relative;display:flex;flex-direction:column;background:#111318;border:1px solid #1E2028;border-radius:4px;flex:1;min-height:200px;overflow:hidden;">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid #1E2028;flex:none;z-index:6;">
-          <span style="font-size:11px;color:#6B6F7A;letter-spacing:0.05em;white-space:nowrap;">PM2.5 FORECAST &mdash; {{ hdr.stationName }} <span style="color:#3A3D46;">/ 60M HORIZON</span></span>
+          <span style="font-size:11px;color:#6B6F7A;letter-spacing:0.05em;white-space:nowrap;">PM2.5 FORECAST · {{ hdr.stationName }} <span style="color:#3A3D46;">/ 60M HORIZON</span></span>
           <div style="display:flex;gap:14px;font-size:11px;color:#6B6F7A;align-items:center;">
             <span style="white-space:nowrap;"><span style="display:inline-block;width:14px;border-top:1.5px solid #C9CBCF;vertical-align:middle;margin-right:5px;"></span>ACTUAL</span>
             <span style="white-space:nowrap;"><span style="display:inline-block;width:14px;border-top:1px dashed #FF4500;vertical-align:middle;margin-right:5px;"></span>FORECAST</span>
@@ -206,7 +206,7 @@ class Component extends DCLogic {
     this.chartRef = (el)=>{ this.chartEl = el; };
     this.flashRef = (el)=>{ this.flashEl = el; };
 
-    // start empty — real data streams in from the backend (no more simulation)
+    // start empty: real data streams in from the backend (no more simulation)
     const series = {};
     const latest = {};
     for(const s of this.stations){
@@ -218,7 +218,7 @@ class Component extends DCLogic {
       selected:'jaksel',
       series, latest,
       incidents: [],
-      model: {version:'—', mae:0, rmse:0, n_seen:0},
+      model: {version:'-', mae:0, rmse:0, n_seen:0},
       drift: this.emptyDrift(),
       playing:true, speed:1, connected:false,
       recent:{},
@@ -231,11 +231,11 @@ class Component extends DCLogic {
     return {station_id:id, pm25_now:0, aqi_now:0, horizon_min:60,
       pm25_forecast:0, aqi_forecast:0, forecast_lower:0, forecast_upper:0,
       category_now:'Good', category_forecast:'Good', trend:'flat',
-      model_version:'—', mae_rolling:null, rmse_rolling:null, n_seen:0};
+      model_version:'-', mae_rolling:null, rmse_rolling:null, n_seen:0};
   }
   emptyDrift(){
     const feats=['pm25','temp','humidity','wind_speed'];
-    return {engine:'—', n_total:feats.length, share_drifted:0, n_drifted:0, dataset_drift:false,
+    return {engine:'-', n_total:feats.length, share_drifted:0, n_drifted:0, dataset_drift:false,
       per_feature:feats.map(n=>({name:n, score:0, drifted:false}))};
   }
 
@@ -358,7 +358,7 @@ class Component extends DCLogic {
     if(type==='prediction') return this.applyPrediction(data);
     if(type==='incident')   return this.applyIncident(data);
     if(type==='alert')      return this.applyAlert(data);
-    // 'observation' ignored — prediction already carries pm25_now
+    // 'observation' ignored: prediction already carries pm25_now
   }
 
   modelFromPred(p, prev){
@@ -415,7 +415,7 @@ class Component extends DCLogic {
       const anyPred = (data.predictions||[])[0];
       if(anyPred) model = this.modelFromPred(anyPred, prev.model);
       else if(data.model) model = {
-        version:data.model.version||'—',
+        version:data.model.version||'-',
         mae:(data.model.metrics&&data.model.metrics.mae)||0,
         rmse:(data.model.metrics&&data.model.metrics.rmse)||0,
         n_seen:(data.model.metrics&&data.model.metrics.n_seen)||0,
@@ -435,7 +435,7 @@ class Component extends DCLogic {
     const arr = Array.isArray(pf) ? pf
       : Object.keys(pf).map(k=>({name:k, score:pf[k].score, drifted:pf[k].drifted}));
     return {
-      engine: d.engine || '—',
+      engine: d.engine || '-',
       share_drifted: d.share_drifted!=null ? d.share_drifted : 0,
       n_drifted: d.n_drifted!=null ? d.n_drifted : arr.filter(f=>f.drifted).length,
       n_total: arr.length || 4,

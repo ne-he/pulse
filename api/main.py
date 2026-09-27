@@ -1,4 +1,4 @@
-"""FastAPI app — REST snapshots/history + WebSocket live feed + demo control.
+"""FastAPI app: REST snapshots/history + WebSocket live feed + demo control.
 
 A background task tails the Redis streams, keeps an in-memory snapshot of the
 latest state per station, and broadcasts every new frame to WebSocket clients.
@@ -82,7 +82,7 @@ async def _hydrate() -> None:
                 state["drift"] = row.get("context", {}).get("drift")
         for row in await recent(client, Streams.INCIDENTS, count=50):
             state["incidents"].appendleft(row)
-    except Exception as exc:  # noqa: BLE001 — never let a cold bus block startup
+    except Exception as exc:  # noqa: BLE001 (never let a cold bus block startup)
         print(f"[api] snapshot hydrate skipped ({exc})")
 
 

@@ -1,4 +1,4 @@
-"""Auto model card — every promotion publishes a governance document.
+"""Auto model card: every promotion publishes a governance document.
 
 Model cards (Mitchell et al., 2019) are the rigor signal: intended use, data,
 metrics, ethical considerations, limitations. Generated automatically so the
@@ -49,7 +49,7 @@ def generate_card(record: dict, drift: dict | None = None) -> str:
 
     mae = m.get("mae")
     rmse = m.get("rmse")
-    n_seen = m.get("n_seen", "—")
+    n_seen = m.get("n_seen", "-")
 
     drift_section = ""
     if drift:
@@ -68,7 +68,7 @@ Engine: `{drift.get('engine')}` · share drifted: **{drift.get('share_drifted')}
 {rows}
 {_station_section(drift)}"""
 
-    return f"""# Model Card — PULSE Air-Quality Forecaster `{version}`
+    return f"""# Model Card: PULSE Air-Quality Forecaster `{version}`
 
 **Created:** {created}
 **Promotion reason:** {reason}
@@ -77,7 +77,7 @@ Engine: `{drift.get('engine')}` · share drifted: **{drift.get('share_drifted')}
 ## Intended use
 Short-horizon PM2.5 forecasting for Jakarta monitoring stations, updated per-event
 via online learning. Forecasts include an uncertainty band. For situational
-awareness and operational alerting — **not** regulatory reporting or health
+awareness and operational alerting, **not** regulatory reporting or health
 diagnosis.
 
 ## Training data
@@ -90,8 +90,8 @@ diagnosis.
 ## Metrics (rolling, live)
 | Metric | Value |
 |---|---|
-| MAE | {mae if mae is not None else '—'} |
-| RMSE | {rmse if rmse is not None else '—'} |
+| MAE | {mae if mae is not None else '-'} |
+| RMSE | {rmse if rmse is not None else '-'} |
 | Observations seen | {n_seen} |
 
 > Metrics are computed online from 1-step-ahead residuals over a rolling window,
@@ -106,6 +106,6 @@ diagnosis.
 
 ## Lifecycle
 This card is auto-generated on every model promotion. Drift in the monitored
-feature distribution triggers retraining, a new version, and a fresh card —
+feature distribution triggers retraining, a new version, and a fresh card,
 keeping documentation in lockstep with the deployed model.
 """

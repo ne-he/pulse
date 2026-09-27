@@ -1,10 +1,10 @@
-"""Online forecaster — the '1 hal baru': TRUE incremental learning.
+"""Online forecaster, the '1 hal baru': TRUE incremental learning.
 
 `learn_one` is called on EVERY event (not batch retraining in disguise). Each
 station keeps its own model. We use river's SNARIMAX with weather + time-of-day
 exogenous features, and estimate an uncertainty band from the rolling residual
 std. If river misbehaves, we fall back to a last-value baseline so the walking
-skeleton NEVER breaks — exactly the philosophy in the build plan."""
+skeleton NEVER breaks, exactly the philosophy in the build plan."""
 from __future__ import annotations
 
 import math

@@ -1,4 +1,4 @@
-"""Incident agent — consumes alerts, emits human-readable incident cards.
+"""Incident agent: consumes alerts, emits human-readable incident cards.
 
 Gemini path: structured prompt → narrative. Template path (no key / API error):
 deterministic, grounded card. Either way the dashboard's incident feed stays alive,
@@ -12,7 +12,7 @@ from common.config import Streams, settings
 from common.redis_bus import StreamReader, get_client, publish
 from common.schemas import Incident
 
-# Optional Gemini client — only used when a key is configured.
+# Optional Gemini client: only used when a key is configured.
 _gemini = None
 if settings.gemini_api_key:
     try:
@@ -25,7 +25,7 @@ if settings.gemini_api_key:
         print(f"[agent] Gemini init failed ({exc}); using template fallback")
         _gemini = None
 else:
-    print("[agent] no GEMINI_API_KEY — using deterministic template cards")
+    print("[agent] no GEMINI_API_KEY, using deterministic template cards")
 
 
 # Stop calling a backend that is already telling us no. An exhausted key or a

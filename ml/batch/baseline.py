@@ -1,4 +1,4 @@
-"""M1 batch baseline — the honest comparison point for the online model.
+"""M1 batch baseline: the honest comparison point for the online model.
 
 Trains a simple batch forecaster (persistence + seasonal-naive) on the sample
 CSV and reports MAE/RMSE, so the README can show 'online learning beats / matches

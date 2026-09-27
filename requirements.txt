@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────
-# PULSE — shared Python deps for all services (monorepo, single venv/image)
+# PULSE: shared Python deps for all services (monorepo, single venv/image)
 # Pinned loosely; lockfile/uv can come later. "1 hal baru" = river streaming ML.
 # ──────────────────────────────────────────────────────────────
 

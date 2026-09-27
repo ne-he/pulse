@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>PULSE — dev board (throwaway harness)</title>
+<title>PULSE · dev board (throwaway harness)</title>
 <style>
   :root { --bg:#0b0e14; --card:#141a24; --ink:#e6edf3; --muted:#7d8da1; --orange:#FF4500; --line:#1f2a38; }
   * { box-sizing:border-box; }
@@ -37,8 +37,8 @@
 <header>
   <h1>PULSE</h1>
   <span class="pill" id="status">connecting…</span>
-  <span class="pill" id="model">model —</span>
-  <small class="note">Dev harness only — NOT the real dashboard. Build that in <code>/dashboard</code>.</small>
+  <span class="pill" id="model">model -</span>
+  <small class="note">Dev harness only: NOT the real dashboard. Build that in <code>/dashboard</code>.</small>
 </header>
 
 <main>
@@ -62,7 +62,7 @@
 
   <section class="card">
     <h2>Incident feed</h2>
-    <div class="feed" id="feed"><small class="note">no incidents yet — hit a spike button.</small></div>
+    <div class="feed" id="feed"><small class="note">no incidents yet, hit a spike button.</small></div>
   </section>
 </main>
 
@@ -88,7 +88,7 @@ function renderRows() {
       <td><span class="dot" style="background:${colorFor(p.category_now)}"></span>${p.category_now}</td>
       <td>${p.pm25_forecast?.toFixed(1)} <small class="note">(${p.forecast_lower?.toFixed(0)}–${p.forecast_upper?.toFixed(0)})</small></td>
       <td class="trend-${p.trend}">${p.trend}</td>
-      <td>${p.mae_rolling ?? "—"}</td>
+      <td>${p.mae_rolling ?? "-"}</td>
       <td>${p.n_seen}</td>
     </tr>`).join("") : `<tr><td colspan="8"><small class="note">waiting…</small></td></tr>`;
 }
