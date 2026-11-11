@@ -18,6 +18,11 @@ starts the whole system in one process, with no Redis server, no Docker and no A
 anomaly detection → drift-triggered retraining → auto model card → LLM incident
 card. One `docker compose up`.**
 
+![PULSE dashboard: live PM2.5 forecast with its uncertainty band, per-station sparklines, model health, drift monitor and the incident feed](docs/demo.gif)
+
+*Recorded 11 Nov 2026 from `python -m deploy.demo`, nothing staged. Incident cards
+show `[template]` because the demo runs without a Gemini key.*
+
 Most ML portfolios stop at *"I trained a model."* PULSE is about **what happens
 after deploy**: the model keeps learning per-event, monitors itself for drift,
 retrains and re-documents itself when the world changes, and narrates anomalies in
