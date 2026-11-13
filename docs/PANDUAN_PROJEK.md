@@ -69,3 +69,49 @@ Tombol `[SPIKE]` di dashboard mengirim `POST /control` dengan aksi `trigger_spik
 7. **Model card ditulis ulang otomatis.** `ml/modelcard/generate.py` membuat markdown berisi alasan promosi, metrik, tabel drift per fitur, tabel drift per stasiun, dan stasiun mana yang memicu.
 8. **Drift juga dinarasikan.** Consumer mengirim alert bertipe `drift`, dan agent menulis kartu "Model retrained -> vN".
 9. **Hanya stasiun yang bergeser yang di-reset.** Referensi stasiun yang drift diganti dengan jendela terbarunya. Stasiun yang tenang tetap dinilai terhadap referensi lamanya. Ini yang mencegah satu sensor rewel memicu retrain berulang untuk pergeseran yang sama.
+
+## 4. Peta kode: folder dan file penting
+
+| Path | Isinya apa |
+|---|---|
+| `common/config.py` | Semua setting dari env (12-factor), nama stream, model Gemini `gemini-2.5-flash` |
+| `common/schemas.py` | Kontrak data pydantic: `AQEvent`, `Prediction`, `Alert`, `Incident`, daftar 5 stasiun |
+| `common/redis_bus.py` | Pembungkus Redis Streams. `REDIS_URL=memory://` memakai fakeredis di dalam proses |
+| `common/health.py` | Konversi PM2.5 ke US AQI dan kategori kesehatan beserta warnanya |
+| `ingestion/gen_sample.py` | Generator data sintetis Jakarta (seed 42) |
+| `ingestion/replay.py` | Memutar CSV seolah live, membaca perintah kontrol, menyuntik spike |
+| `ingestion/producer.py` | Mode live: OpenAQ v3 (butuh key) dengan fallback Open-Meteo tanpa key |
+| `ml/online/model.py` | `StationModel`: SNARIMAX river, pita ketidakpastian, MAE/RMSE live, guard divergensi |
+| `ml/online/anomaly.py` | Detektor anomali berbasis kejutan forecast satu langkah (MAD) |
+| `ml/online/consumer.py` | `Engine`: jantung sistem, termasuk loop drift ke retrain |
+| `ml/monitoring/drift.py` | PSI in-house, jalur Evidently, dan agregasi per stasiun |
+| `ml/registry/registry.py` | Registry versi model berbasis file JSON lokal |
+| `ml/modelcard/generate.py` | Generator model card markdown |
+| `ml/batch/baseline.py` | Baseline batch sebagai pembanding |
+| `agent/incident.py`, `agent/prompts.py` | Agent kartu insiden (Gemini + template) dan teks prompt-nya |
+| `api/main.py`, `api/ws.py` | REST, WebSocket, `POST /control`, dan penyajian dashboard dari origin yang sama |
+| `Frontend_pulse/` | Dashboard dc-runtime (`index.html` mengarahkan ke `PULSE Dashboard.dc.html`), plus `FRONTEND_SPEC.md` sebagai kontrak data |
+| `deploy/demo.py` | Satu perintah untuk seluruh sistem di satu proses, dengan warm-up |
+| `deploy/space_boot.py` | Penyala lima proses dalam satu container (untuk jalur Render yang belum dieksekusi) |
+| `scripts/smoke.py`, `scripts/error_curve.py`, `scripts/bench.py` | Uji pipeline offline, kurva error vs baseline, benchmark |
+| `tests/` | 41 test di 6 file (online learning, drift, loop retrain, replay control, pipeline, engine drift) |
+| `.github/workflows/ci.yml`, `retrain.yml` | CI (ruff, pytest, smoke) dan workflow terjadwal harian |
+| `docs/` | `METRICS.md`, `bench.json`, `TEST_GAP_MAP.md`, `DEMO.md`, `DEPLOY.md`, `demo.gif`, `error_curve.png` |
+
+## 5. Teknologi yang dipakai dan kenapa
+
+| Teknologi | Kenapa dipilih |
+|---|---|
+| river 0.21.1 | Library online learning Python. Punya `learn_one` per event, persis yang dibutuhkan |
+| SNARIMAX | Model deret waktu yang bisa belajar inkremental dan menerima fitur cuaca. Dipilih karena cocok dengan online learning, bukan karena paling akurat |
+| Redis Streams | Message bus paling ringan yang tetap streaming sungguhan. Kafka/Redpanda terlalu berat untuk satu orang |
+| fakeredis | Supaya demo bisa jalan di satu proses tanpa server Redis |
+| FastAPI + WebSocket | REST async plus dorongan data live ke browser |
+| PSI in-house | Diukur lebih tepat dari Evidently di jendela 200 event (lihat bagian 6) |
+| Evidently 0.4.25 | Tetap terpasang dan dites, bisa dipilih lewat `DRIFT_ENGINE=evidently` |
+| Gemini `gemini-2.5-flash` | Free tier, menulis kartu insiden. Fallback template supaya sistem tidak bergantung pada key |
+| Registry JSON lokal | Cepat dikirim. Desainnya cuma perlu ganti satu file untuk pindah ke Supabase |
+| Docker Compose | Bentuk deployment yang realistis: lima layanan terpisah plus Redis |
+| GitHub Actions | CI lint + test + smoke, dan workflow terjadwal |
+
+Yang sengaja dipangkas untuk v1 (ditulis di README): Redpanda, Supabase, dan DVC. Tenaga difokuskan ke satu hal baru, yaitu streaming plus online learning.
