@@ -185,3 +185,34 @@ Catatan RAM: diukur di Windows dengan Python 3.12, sedangkan image Docker-nya Li
 - `gen_sample.py` menjangkar tanggal ke hari ini, jadi regenerasi di hari lain menggeser angka sedikit. `scikit-learn` tidak di-pin.
 - Dockerfile dan jalur Render belum pernah di-build, karena Docker tidak terpasang di mesin pengembangan (`docs/DEPLOY.md`).
 - Beberapa dokumen basi: `PROJECT_BRIEF.md` masih menyebut HalfSpaceTrees dan "deploy publik adalah langkah berikutnya", `docs/DEPLOY.md` bagian 5 masih membahas masalah 58,3% dan menyebut 27 test, bagian Milestones README masih menulis target deploy publik.
+
+## 10. Cara menjalankan dan deploy
+
+Jalur demo (yang dipakai untuk presentasi):
+
+```
+pip install -r requirements.txt
+python -m deploy.demo
+```
+
+Browser terbuka di http://localhost:8000 setelah warm-up sekitar 17 detik. Di Windows bisa klik dua kali `demo.cmd`. Flag yang berguna: `--warm 0` (cold start sengaja), `--no-browser` (untuk merekam), `--speed 1200`, `--fresh` (hapus registry, versi mulai dari v1), `--port 9000`. Satu hal yang perlu dicek sendiri: dashboard membaca backend dari `?api=` dengan default `http://localhost:8000`, jadi kalau pakai `--port` lain kemungkinan perlu membuka dashboard dengan `?api=http://localhost:9000`. Ini kesimpulan dari membaca kode, belum dicoba `[?]`.
+
+Jalur bentuk deployment sungguhan (lima layanan terpisah):
+
+```
+cp .env.example .env
+docker compose up --build
+```
+
+Dashboard di http://localhost:3000, API docs di http://localhost:8000/docs.
+
+Jalur cek tanpa Docker:
+
+```
+python -m scripts.smoke
+python -m scripts.error_curve
+python -m scripts.bench
+pytest -q
+```
+
+Soal deploy publik: rencana awal ke Hugging Face Docker Space batal karena Docker Space butuh PRO sejak Juli 2026. `docs/DEPLOY.md` membahas alternatif Render free (Web Service Docker, 512 MB RAM, 0,1 CPU) untuk backend plus Vercel statis untuk dashboard, lengkap dengan anggaran RAM dan tabel troubleshooting. Rencana itu belum dieksekusi dan tidak ada URL Render atau Vercel milik PULSE. Variabel env yang relevan (nama saja): `GEMINI_API_KEY`, `ANOMALY_THRESHOLD`, `REPLAY_SPEED`, `INGEST_MODE`, `OPENAQ_API_KEY`, `DRIFT_ENGINE`, `REDIS_URL`.
