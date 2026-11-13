@@ -216,3 +216,24 @@ pytest -q
 ```
 
 Soal deploy publik: rencana awal ke Hugging Face Docker Space batal karena Docker Space butuh PRO sejak Juli 2026. `docs/DEPLOY.md` membahas alternatif Render free (Web Service Docker, 512 MB RAM, 0,1 CPU) untuk backend plus Vercel statis untuk dashboard, lengkap dengan anggaran RAM dan tabel troubleshooting. Rencana itu belum dieksekusi dan tidak ada URL Render atau Vercel milik PULSE. Variabel env yang relevan (nama saja): `GEMINI_API_KEY`, `ANOMALY_THRESHOLD`, `REPLAY_SPEED`, `INGEST_MODE`, `OPENAQ_API_KEY`, `DRIFT_ENGINE`, `REDIS_URL`.
+
+## 11. Cara menjelaskan ke rekruter
+
+**Pitch 30 detik (Indonesia)**
+
+"Kebanyakan projek ML berhenti di 'saya melatih model'. PULSE mulai dari situ. Ini sistem streaming kualitas udara untuk lima stasiun Jakarta. Modelnya belajar dari setiap bacaan baru lewat river, menandai lonjakan berdasarkan seberapa jauh bacaan menyimpang dari normalnya dalam sigma, dan memantau drift per stasiun. Kalau pola bergeser, sistem membuat versi model baru, menulis ulang model card, dan agent Gemini menarasikan kejadiannya. Saya menulis test untuk klaim saya sendiri, dan test itu menemukan bahwa online learning-nya sempat tidak pernah jalan. Semua angka, termasuk stasiun tempat model saya kalah, ada di repo."
+
+**Pitch 30 detik (English)**
+
+"Most ML portfolios stop at 'I trained a model'. PULSE starts there. It is a streaming air-quality system for five Jakarta stations. The model learns from every single reading with river, flags spikes by how many sigmas they sit from that station's normal, and monitors drift per station. When the data shifts, the system mints a new model version, rewrites its model card, and a Gemini agent narrates what happened. I wrote tests for my own claims, and they caught that online learning had silently never run. Every number is in the repo, including the station where my model loses."
+
+**Pertanyaan yang mungkin muncul**
+
+1. **"Kok gak ada link live?"** Sengaja. PULSE itu lima proses yang jalan terus. Hosting gratis memberi satu container yang tidur setelah 15 menit, CPU 0,1, dan disk yang hilang tiap restart, jadi yang dilihat orang cuma layar loading atau dashboard kosong. Gantinya ada GIF 20 detik dari run asli di README, dan `python -m deploy.demo` yang jalan dengan satu perintah. Kalau mau, saya bisa share screen dan menekan tombol spike langsung.
+2. **"Apa bedanya online learning dengan retrain berkala?"** Retrain berkala melatih ulang dengan batch data tiap jadwal. Di PULSE, `learn_one` dipanggil di setiap event. "Retrain" saat drift cuma membekukan state itu jadi versi resmi plus dokumentasi.
+3. **"Seberapa bagus modelnya?"** MAE rata-rata 3,28 vs persistence 3,42, menang di 5 stasiun tapi cuma 2,8% sampai 6,8%, dan di Jaksel kalah RMSE. Persistence itu baseline kuat di data 10 menit, dan saya memilih melaporkannya apa adanya.
+4. **"Bagaimana kamu tahu sistemnya benar-benar jalan?"** Dari test yang menguji state model berubah, bukan cuma "outputnya ada". Test itu yang menemukan bug `m=0`: setiap forecast sempat persistence diam-diam. Pelajarannya, fallback yang diam kelihatan seperti sistem sehat.
+5. **"Kenapa PSI buatan sendiri, bukan Evidently?"** Diukur. Di jendela 200 event, PSI berbasis kuantil benar 6 dari 6 kasus, Evidently 5 dari 6 dan sempat menandai stasiun yang tidak bergerak. Evidently tetap terpasang dan dites, bisa dipilih lewat env.
+6. **"Anomali dideteksi bagaimana?"** Selisih bacaan dengan bacaan sebelumnya, dibagi sigma dari MAD residual terbaru stasiun itu. Detektor lama (HalfSpaceTrees) menandai 58,3% event, yang baru 0,50%. Belum ada data label, jadi saya tidak mengklaim detektornya "akurat".
+7. **"Apa yang terjadi kalau Gemini mati?"** Kartu template deterministik selalu siap, dan label `generated_by` menunjukkan sumbernya. Setelah 3 kegagalan beruntun agent berhenti mencoba supaya demo tidak lag. Pernah kejadian model Gemini lama pensiun dan semua kartu diam-diam jadi template, sekarang sudah pakai `gemini-2.5-flash`.
+8. **"Kalau dibawa ke produksi beneran, apa yang kurang?"** Registry pindah ke database hosted, test untuk API dan ingestion live, kalibrasi anomali dengan data berlabel, dan layanan dipisah lagi seperti di `docker-compose.yml`, bukan satu container.
