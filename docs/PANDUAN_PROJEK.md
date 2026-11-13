@@ -115,3 +115,45 @@ Tombol `[SPIKE]` di dashboard mengirim `POST /control` dengan aksi `trigger_spik
 | GitHub Actions | CI lint + test + smoke, dan workflow terjadwal |
 
 Yang sengaja dipangkas untuk v1 (ditulis di README): Redpanda, Supabase, dan DVC. Tenaga difokuskan ke satu hal baru, yaitu streaming plus online learning.
+
+## 6. Angka dan bukti
+
+Semua angka di bawah berasal dari replay `data/sample_aq.csv` (10.080 event sintetis). Bukan data Jakarta sungguhan.
+
+| Angka | Nilai | Sumber |
+|---|---|---|
+| MAE rata-rata online vs persistence vs seasonal-naive | 3,280 vs 3,417 vs 7,449 µg/m³ | `docs/METRICS.md` |
+| Online menang MAE atas persistence | 5 dari 5 stasiun, selisih 2,8% sampai 6,8% | `docs/METRICS.md` |
+| RMSE Jaksel, online vs persistence | 6,148 vs 5,931 (online kalah) | `docs/METRICS.md` |
+| Event sampai online unggul permanen | 1.102 sampai 2.011 event, Jaksel tidak pernah stabil | `docs/METRICS.md` |
+| Throughput pipeline ML | 269,7 event/detik (10.080 event dalam 37,4 detik) | `docs/bench.json` |
+| Latensi event ke prediksi | p50 2,6 ms, p95 4,3 ms, p99 16,3 ms | `docs/bench.json` |
+| Retrain | 23 kali dalam 335,8 jam data (0,0685 per jam data), 41 per jam dinding di speed 600 | `docs/bench.json` |
+| Rate anomali | 58,3% turun ke 0,50% (50 dari 10.080) | `README.md`, `docs/TEST_GAP_MAP.md` bagian 6b, commit `9c3644c` |
+| False positive drift di `drift_window=200` | 0 dari 12 (di window 30: 12 dari 12) | `docs/TEST_GAP_MAP.md` temuan 3 |
+| PSI in-house vs Evidently PSI | 6/6 vs 5/6 vonis benar | `ml/monitoring/drift.py`, `README.md` |
+| MAE saat model diverge (sebelum diperbaiki) | sekitar 5,5e10 µg/m³ | `docs/TEST_GAP_MAP.md`, `ml/online/model.py` |
+| Uji stabilitas 30.000 event | MAE 3,27, forecast tertinggi 144 | `ml/online/model.py` |
+| Jumlah test | 41 (dari 6 di awal) | `README.md` build log |
+| RAM semua proses dalam satu container | sekitar 383 MB dari 512 MB | `docs/DEPLOY.md` bagian 2 |
+| Warm-up demo | 600 frame (3.000 event), sekitar 17 detik | `docs/DEMO.md`, `deploy/demo.py` |
+
+Catatan jujur soal `docs/bench.json`: file itu terakhir ditulis 3 Agustus 2026, sebelum detektor anomali diganti tanggal 9 Agustus. Isinya masih mencatat `anomalies_flagged: 5873` (yang 58,3%). Angka 0,50% di README berasal dari pengukuran commit `9c3644c`, bukan dari `bench.json`. Throughput dan latensi di atas juga diukur dengan detektor lama. Perlu dijalankan ulang `python -m scripts.bench` supaya file bukti dan README sinkron.
+
+Catatan RAM: diukur di Windows dengan Python 3.12, sedangkan image Docker-nya Linux Python 3.11. Anggap batas atas kasar.
+
+## 7. Keputusan desain penting
+
+**Tanpa demo publik.** Ini keputusan arsitektur, bukan pekerjaan yang tertinggal. PULSE adalah sistem multi-proses real-time: ingestion, consumer ML, agent, API, dan bus. Hosting gratis hanya memberi satu container kecil yang tidur setelah 15 menit tanpa traffic (Render free, lihat `docs/DEPLOY.md` bagian 7), filesystem-nya hilang tiap restart sehingga riwayat versi model mulai dari nol lagi, dan CPU-nya cuma 0,1. Rekruter yang mengklik link seperti itu akan melihat halaman loading atau dashboard kosong, lalu menyimpulkan sistemnya tidak jalan. Demo gratisan justru salah menggambarkan sistemnya. Trade-off-nya: orang yang tidak meng-clone repo tidak bisa mencoba sendiri. Penambalnya dua: GIF 20 detik di README (direkam dari `python -m deploy.demo` asli, tidak dipentaskan) dan demo lokal satu perintah.
+
+**Demo satu perintah dengan warm-up.** `python -m deploy.demo` menjalankan bus di dalam proses (`REDIS_URL=memory://`), tanpa Docker dan tanpa API key. Sebelum browser terbuka, 600 frame didorong lewat `Engine` asli. Angka 600 diukur: di bawah itu feed insiden kosong dan belum ada retrain akibat drift. Engine yang sudah hangat diserahkan ke thread consumer, jadi model live melanjutkan, bukan mulai dari nol.
+
+**SNARIMAX, bukan deep learning.** Nilai projek ada di siklus hidup di sekitar model. Harganya terlihat di angka: menang tipis, dan kalah RMSE di Jaksel.
+
+**Drift per stasiun, bukan gabungan.** Kalau lima stasiun digabung, satu stasiun yang melonjak dari sekitar 42 ke 125 µg/m³ cuma menghasilkan PSI gabungan 0,19, di bawah ambang 0,2, dan laporannya tidak bisa menyebut stasiun mana (README build log 2 Agustus).
+
+**PSI sebagai default, Evidently opsional.** Default Evidently memakai uji K-S dan mengembalikan p-value sebagai `drift_score`, yang maknanya terbalik (rendah berarti drift). Engine dipilih eksplisit lewat `DRIFT_ENGINE` supaya lokal, CI, dan server memakai detektor yang sama.
+
+**Detektor anomali diganti statistiknya, bukan ambangnya.** Skor HalfSpaceTrees lama menumpuk di desil teratas (median 0,90), sampai spike demo skornya lebih rendah dari event biasa. Harganya: kalibrasi baru ini masuk akal secara konstruksi, belum diuji terhadap label insiden.
+
+**Fallback boleh, asal berisik.** river, Evidently, dan Gemini punya jalur cadangan masing-masing. Pelajaran mahalnya: fallback yang diam kelihatan persis seperti sistem yang jalan, jadi sekarang setiap fallback mencetak log keras dan dites.
