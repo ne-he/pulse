@@ -237,3 +237,33 @@ Soal deploy publik: rencana awal ke Hugging Face Docker Space batal karena Docke
 6. **"Anomali dideteksi bagaimana?"** Selisih bacaan dengan bacaan sebelumnya, dibagi sigma dari MAD residual terbaru stasiun itu. Detektor lama (HalfSpaceTrees) menandai 58,3% event, yang baru 0,50%. Belum ada data label, jadi saya tidak mengklaim detektornya "akurat".
 7. **"Apa yang terjadi kalau Gemini mati?"** Kartu template deterministik selalu siap, dan label `generated_by` menunjukkan sumbernya. Setelah 3 kegagalan beruntun agent berhenti mencoba supaya demo tidak lag. Pernah kejadian model Gemini lama pensiun dan semua kartu diam-diam jadi template, sekarang sudah pakai `gemini-2.5-flash`.
 8. **"Kalau dibawa ke produksi beneran, apa yang kurang?"** Registry pindah ke database hosted, test untuk API dan ingestion live, kalibrasi anomali dengan data berlabel, dan layanan dipisah lagi seperti di `docker-compose.yml`, bukan satu container.
+
+## 12. Kamus istilah
+
+| Istilah | Artinya dalam bahasa sederhana |
+|---|---|
+| PM2.5 | Partikel debu sangat halus (di bawah 2,5 mikrometer) yang bisa masuk ke paru-paru. Satuannya µg/m³ |
+| AQI | Indeks kualitas udara skala US EPA, dari Good sampai Hazardous |
+| Streaming | Data diproses satu per satu saat datang, bukan dikumpulkan dulu |
+| Online learning | Model belajar dari setiap data baru, langsung, tanpa melatih ulang dari nol |
+| `learn_one` | Fungsi river untuk belajar dari satu contoh data |
+| river | Library Python untuk machine learning yang belajar per event |
+| SNARIMAX | Model deret waktu yang memakai nilai-nilai sebelumnya plus fitur luar seperti cuaca |
+| Persistence baseline | Tebakan paling malas: nilai berikutnya sama dengan nilai terakhir |
+| Seasonal-naive | Tebakan: nilai sekarang sama dengan nilai jam yang sama kemarin |
+| MAE | Rata-rata besar kesalahan tebakan |
+| RMSE | Mirip MAE, tapi kesalahan besar dihukum lebih berat |
+| Pita ketidakpastian | Rentang di sekitar tebakan yang menunjukkan seberapa yakin model |
+| Anomali | Bacaan yang jauh menyimpang dari pola normal stasiun itu |
+| MAD | Median dari jarak tiap nilai ke median. Ukuran sebaran yang tidak gampang terpengaruh nilai ekstrem |
+| Sigma / z-score | Seberapa jauh sebuah nilai dari normal, diukur dalam satuan sebaran |
+| Drift | Pola data yang masuk bergeser dari pola yang dulu dipelajari model |
+| PSI | Population Stability Index, angka yang mengukur seberapa beda dua distribusi. Di atas 0,2 dianggap bergeser |
+| Model registry | Buku catatan versi model: v1, v2, dan seterusnya, dengan metrik dan alasannya |
+| Model card | Dokumen satu halaman yang menjelaskan model: kegunaan, data, metrik, batasan |
+| Redis Streams | Papan pengumuman berurutan tempat layanan saling kirim pesan |
+| fakeredis | Tiruan Redis yang hidup di dalam proses Python, dipakai untuk demo |
+| WebSocket | Saluran dua arah yang tetap terbuka, sehingga server bisa mendorong data ke browser |
+| Replay | Memutar ulang data lama seolah-olah sedang terjadi sekarang |
+| Fallback | Jalur cadangan kalau komponen utama gagal |
+| CI | Continuous Integration: test otomatis tiap kali kode di-push |
