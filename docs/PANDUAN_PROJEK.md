@@ -157,3 +157,31 @@ Catatan RAM: diukur di Windows dengan Python 3.12, sedangkan image Docker-nya Li
 **Detektor anomali diganti statistiknya, bukan ambangnya.** Skor HalfSpaceTrees lama menumpuk di desil teratas (median 0,90), sampai spike demo skornya lebih rendah dari event biasa. Harganya: kalibrasi baru ini masuk akal secara konstruksi, belum diuji terhadap label insiden.
 
 **Fallback boleh, asal berisik.** river, Evidently, dan Gemini punya jalur cadangan masing-masing. Pelajaran mahalnya: fallback yang diam kelihatan persis seperti sistem yang jalan, jadi sekarang setiap fallback mencetak log keras dan dites.
+
+## 8. Update terbaru
+
+| Tanggal | Yang terjadi |
+|---|---|
+| 22 Jun 2026 | Kerangka penuh dibangun, semua layanan tersambung di mode replay (README build log) |
+| 15 Jul 2026 | Commit pertama `92cc1cd`: backend end-to-end plus dashboard tersambung |
+| 2 sampai 3 Agu 2026 | Test ditulis untuk membuktikan klaim, dan dua klaim ternyata salah. Online learning tidak pernah jalan karena `m=0` di SNARIMAX bikin `learn_one` pertama error lalu diam-diam jatuh ke baseline. Setelah dinyalakan, model diverge, diperbaiki dengan `d=1` dan learning rate lebih pelan. Drift dibuat per stasiun. Kurva error dan benchmark ditambahkan (commit `14a419a`) |
+| 5 Agu 2026 | Jalur deploy satu container plus dashboard Vercel disiapkan, lalu target dipindah dari HF Space ke Render karena Docker Space butuh langganan PRO sejak sekitar Juli 2026 (`78b03b8`) |
+| 9 Agu 2026 | Detektor anomali diganti: 58,3% jadi 0,50% (`9c3644c`). Tombol `[SPIKE]` yang ternyata tidak pernah berfungsi diperbaiki (`9445b74`). `python -m deploy.demo` lahir (`78aabd1`) |
+| 14 Agu 2026 | CI merah 6 run karena detektor drift beda antara lokal (PSI) dan CI (Evidently), diperbaiki dengan engine eksplisit (`6904b25`). Model Gemini lama pensiun dan kartu insiden diam-diam jadi template, diganti ke `gemini-2.5-flash` (`ca0f44f`) |
+| 26 Sep 2026 | README menyatakan terang: tanpa demo publik, by design (`5dcab67`) |
+| 28 Sep 2026 | Em dash dibersihkan dari docs, komentar, dan teks UI |
+| 11 Nov 2026 | GIF demo 20 detik (`docs/demo.gif`) dipasang di bawah pitch README, direkam dari `python -m deploy.demo` asli: chart forecast PM2.5 dengan pita ketidakpastian, sparkline per stasiun, model health, drift monitor, feed insiden. Kartu insiden di GIF berlabel `[template]` karena direkam tanpa key Gemini (`84b004a`) |
+
+## 9. Batasan jujur dan yang belum dikerjakan
+
+- Data demo sintetis. Mode live (OpenAQ plus Open-Meteo) ada di kode tapi `ingestion/producer.py` belum punya test.
+- Keunggulan online learning tipis (2,8% sampai 6,8% MAE), butuh 1.100 sampai 2.000 event sebelum unggul, dan kalah RMSE di Jaksel.
+- Detektor anomali belum dikalibrasi terhadap label insiden. Klaim yang sah cuma "skornya punya arti dalam sigma dan rate-nya masuk akal".
+- Drift yang hanya terjadi di PM2.5 sementara cuaca tetap tidak memicu retrain, karena 1 dari 4 fitur = share 0,25, di bawah 0,5. Perilaku ini dikunci test `test_pm25_only_shift_flags_the_feature_but_not_the_dataset`.
+- `api/main.py` (12 route plus WebSocket) belum punya test. Begitu juga validasi `Literal` di skema (`docs/TEST_GAP_MAP.md` bagian 5).
+- Workflow `retrain.yml` yang jalan harian sebenarnya baru meregenerasi sampel dan mengevaluasi baseline batch. Belum ada promosi versi ke registry remote (masih TODO Supabase di file itu).
+- Registry masih JSON lokal, DVC belum dipasang.
+- `docs/bench.json` belum diperbarui sejak detektor anomali diganti (lihat bagian 6).
+- `gen_sample.py` menjangkar tanggal ke hari ini, jadi regenerasi di hari lain menggeser angka sedikit. `scikit-learn` tidak di-pin.
+- Dockerfile dan jalur Render belum pernah di-build, karena Docker tidak terpasang di mesin pengembangan (`docs/DEPLOY.md`).
+- Beberapa dokumen basi: `PROJECT_BRIEF.md` masih menyebut HalfSpaceTrees dan "deploy publik adalah langkah berikutnya", `docs/DEPLOY.md` bagian 5 masih membahas masalah 58,3% dan menyebut 27 test, bagian Milestones README masih menulis target deploy publik.
